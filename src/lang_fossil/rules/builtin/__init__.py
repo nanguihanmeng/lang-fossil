@@ -1,1 +1,1 @@
-"""Builtin rule packs (packaged data)."""
+"""内置规则包（随包分发的数据文件）."""

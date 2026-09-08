@@ -1,16 +1,13 @@
-"""parso-based Python front end supporting multiple grammar versions.
+"""基于 parso 的多语法版本 Python 前端.
 
-parso ≥ 0.8.2 removed the historical Python 2 grammar files from its
-distribution, so the Python 2.7 grammar is vendored with this package
-(``grammars/grammar27.txt``, taken from parso v0.7.1, MIT licensed) and
-loaded via ``parso.load_grammar(path=...)``. This keeps the spec promise:
-Python 2 corpora parse on Python 3 interpreters (spec appendix C, M0 PoC).
+parso ≥ 0.8.2 已从发行包移除历史 Python 2 语法文件，因此 Python 2.7
+语法随包 vendor（``grammars/grammar27.txt``，取自 parso v0.7.1，MIT
+许可），经 ``parso.load_grammar(path=...)`` 加载。以此兑现规范承诺：
+Py2 语料在 Py3 解释器上可解析（规范附录 C，M0 PoC）.
 
-Strategy: parse with the interpreter's grammar first; if syntax errors are
-reported and the source smells like Python 2, retry with the vendored 2.7
-grammar and keep the result with fewer errors. Sources older than 2.7 are
-outside parso's support range and fall through to regex-heuristic rules
-(rules flagged ``match_mode: heuristic``).
+策略：先用解释器自带语法解析；若报语法错误且源码嗅探为 Python 2，
+改用 vendored 2.7 语法重试并保留错误更少的结果。早于 2.7 的源码超出
+parso 支持范围，落入正则启发式规则（``match_mode: heuristic``）.
 """
 
 from __future__ import annotations
@@ -25,26 +22,25 @@ from lang_fossil.core.models import ParseResult
 
 _PY2_VERSION = "2.7"
 _PY2_GRAMMAR_PATH = Path(__file__).parent / "grammars" / "grammar27.txt"
-_MIN_GRAMMAR_DIGITS = 2  # grammar file names carry >= 2 digits ("39", "310")
+_MIN_GRAMMAR_DIGITS = 2  # 语法文件名至少 2 位数字（"39"、"310"）
 
-# Constructs that only exist before Python 3; used to decide whether a Py2
-# grammar retry is worth attempting.
+# 仅 Python 3 之前存在的构造；用于判断是否值得尝试 2.7 语法重试.
 _PY2_HINTS = re.compile(
-    r"^\s*print\s+[^(=]|"  # print statement
+    r"^\s*print\s+[^(=]|"  # print 语句
     r"raise\s+\w+\s*,\s*|"  # raise E, msg
-    r"^\s*exec\s+[^\s(]|"  # exec statement
+    r"^\s*exec\s+[^\s(]|"  # exec 语句
     r"[\s(]<{2}\s*\d|"  # print >> stream
-    r"=\s*[uU][rR][\"']|"  # ur'' string literal
-    r"[\w)\]]`|`[\w(]",  # backtick repr
+    r"=\s*[uU][rR][\"']|"  # ur'' 字符串字面量
+    r"[\w)\]]`|`[\w(]",  # 反引号 repr
     re.MULTILINE,
 )
 
 
 def _load_py2_grammar() -> Any:
-    """Load the vendored Python 2.7 grammar.
+    """加载 vendored 的 Python 2.7 语法.
 
     Returns:
-        A parso grammar, or ``None`` when the vendored file is missing.
+        parso 语法对象；vendored 文件缺失时为 ``None``.
     """
     try:
         return parso.load_grammar(path=str(_PY2_GRAMMAR_PATH))
@@ -53,17 +49,16 @@ def _load_py2_grammar() -> Any:
 
 
 def _load_default_grammar() -> Any:
-    """Load the interpreter's grammar, falling back to the newest available.
+    """加载解释器自带语法，失败时回退到最新可用语法.
 
     Returns:
-        A parso grammar, or ``None`` when no grammar can be loaded at all.
+        parso 语法对象；完全无法加载时为 ``None``.
     """
     try:
         return parso.load_grammar()
     except (OSError, NotImplementedError, ValueError):
         pass
-    # Future interpreters may exceed parso's bundled grammars: pick the
-    # highest grammar file the installed parso actually ships.
+    # 未来解释器可能超出 parso 内置语法范围：选取实际发行的最高语法文件.
     grammar_dir = Path(parso.__file__).parent / "python"
     candidates: list[tuple[int, int, Path]] = []
     for grammar_file in grammar_dir.glob("grammar*.txt"):
@@ -80,20 +75,19 @@ def _load_default_grammar() -> Any:
 
 
 class ParsoPythonParser:
-    """Multi-grammar-version Python parser (main workhorse)."""
+    """多语法版本的 Python 解析器（主力前端）."""
 
     language = "python"
 
     def parse(self, source: str, *, path: str = "<source>") -> ParseResult:
-        """Parse Python source, falling back to the 2.7 grammar when needed.
+        """解析 Python 源码，必要时回退 2.7 语法.
 
         Args:
-            source: Raw Python source text.
-            path: Path used in diagnostics only.
+            source: 原始源码文本.
+            path: 仅用于诊断输出的路径.
 
         Returns:
-            The parse result with the fewest syntax errors; grammar version
-            actually used is recorded on the result.
+            语法错误最少的解析结果；实际使用的语法版本记录在结果上.
         """
         modern = self._parse_with_version(source, None)
         modern_errors = list(modern["errors"])
@@ -122,16 +116,16 @@ class ParsoPythonParser:
         )
 
     def _parse_with_version(self, source: str, version: str | None) -> dict[str, Any]:
-        """Parse with an explicit grammar version, collecting errors.
+        """用指定语法版本解析并收集错误.
 
         Args:
-            source: Raw Python source text.
-            version: Grammar version (``None`` = current interpreter;
-                ``"2.7"`` = vendored Py2 grammar).
+            source: 原始源码文本.
+            version: 语法版本（``None`` = 当前解释器；``"2.7"`` = vendored
+                Py2 语法）.
 
         Returns:
-            Dict with keys ``tree`` (parso node or ``None``), ``errors``
-            (list of formatted error strings) and ``version`` (label).
+            含 ``tree``（parso 节点或 ``None``）、``errors``（格式化的
+            错误字符串列表）与 ``version``（标签）的字典.
         """
         if version is None:
             grammar = _load_default_grammar()
@@ -145,7 +139,7 @@ class ParsoPythonParser:
         try:
             tree = grammar.parse(source)
         except (RecursionError, ValueError, NotImplementedError) as exc:
-            # parso itself should not raise; degrade defensively regardless.
+            # parso 自身不应抛异常；无论如何防御性降级.
             return {"tree": None, "errors": [f"parser failure: {exc}"], "version": label}
 
         errors: list[str] = []
@@ -156,6 +150,6 @@ class ParsoPythonParser:
                     f" col {getattr(error, 'column', '?')}:"
                     f" {getattr(error, 'message', 'syntax error')}"
                 )
-        except (RecursionError, ValueError):  # pragma: no cover - defensive
+        except (RecursionError, ValueError):  # pragma: no cover - 防御性
             errors.append("error collection failed")
         return {"tree": tree, "errors": errors, "version": label}

@@ -1,8 +1,7 @@
-"""``--fix`` bridge: map fossils to external fixer commands.
+"""``--fix`` 桥接：把化石映射到外部修复器命令.
 
-lang-fossil does not reimplement codemods: it bridges to established tools
-(pyupgrade, eslint --fix) grouped per file, so a single invocation covers
-all fixable fossils in that file.
+lang-fossil 不自行实现 codemod：按文件分组桥接到成熟工具
+（pyupgrade、eslint --fix），一次调用即可覆盖该文件内全部可修复化石.
 """
 
 from __future__ import annotations
@@ -15,20 +14,20 @@ from lang_fossil.core.models import Fossil
 
 _PYTHON_TOOL = ("pyupgrade", "--py3-plus")
 _JS_TOOL = ("eslint", "--fix")
-# Languages without a bridged fixer produce no fix commands; the fossil rule
-# simply carries no fix_hint (or a hint with no tool, which is skipped).
+# 没有桥接修复器的语言不产生修复命令；规则自然不带 fix_hint（或虽有
+# hint 但无工具，同样跳过）.
 _TOOL_BY_LANGUAGE = {
     "python": _PYTHON_TOOL,
     "javascript": _JS_TOOL,
 }
 
-# Languages with a bridged fixer (surfaced so the CLI can state the scope).
+# 有桥接修复器的语言集合（供 CLI 说明桥接范围）.
 FIXABLE_LANGUAGES = frozenset(_TOOL_BY_LANGUAGE)
 
 
 @dataclass(frozen=True)
 class FixCommand:
-    """One concrete external fixer invocation."""
+    """一次具体的外部修复器调用."""
 
     tool: str
     args: tuple[str, ...]
@@ -37,39 +36,38 @@ class FixCommand:
 
     @property
     def run_args(self) -> tuple[str, ...]:
-        """Build the argv for execution.
+        """构造可执行的 argv.
 
-        Paths that start with ``-`` are guarded with the ``--`` end-of-options
-        separator so a file named like a flag can never be parsed as an option
-        by the bridged tool (list args already rule out shell injection).
+        以 ``-`` 开头的路径加 ``--`` 选项结束符保护，避免形如选项的文件
+        名被桥接工具当作参数解析（列表传参已排除 shell 注入）.
 
         Returns:
-            The full argument vector: tool, tool args, paths.
+            完整参数向量：tool、工具参数、路径.
         """
         separator: tuple[str, ...] = ("--",) if any(p.startswith("-") for p in self.paths) else ()
         return (self.tool, *self.args, *separator, *self.paths)
 
     @property
     def command_line(self) -> str:
-        """Render the full command line for display or execution.
+        """渲染完整命令行，供展示或执行.
 
         Returns:
-            The command as a shell-agnostic string.
+            与 shell 无关的命令字符串.
         """
         return " ".join(self.run_args)
 
 
 def build_fix_plan(fossils: list[Fossil]) -> list[FixCommand]:
-    """Group fixable fossils into per-tool, per-file fix commands.
+    """把可修复化石按工具、按文件分组成修复命令.
 
-    A fossil is fixable when its rule carries a ``fix_hint``. Files are
-    grouped so each tool sees each path once.
+    化石携带 ``fix_hint`` 即视为可修复。文件分组保证每个工具对每个
+    路径只调用一次.
 
     Args:
-        fossils: Fossils from a scan.
+        fossils: 扫描得到的化石.
 
     Returns:
-        Fix commands in deterministic order.
+        顺序确定的修复命令列表.
     """
     grouped: dict[tuple[str, tuple[str, ...]], set[str]] = {}
     for fossil in fossils:
@@ -78,7 +76,7 @@ def build_fix_plan(fossils: list[Fossil]) -> list[FixCommand]:
         language = sniff_language(Path(fossil.path))
         tool = _TOOL_BY_LANGUAGE.get(language or "")
         if tool is None:
-            continue  # no bridged fixer for this language yet
+            continue  # 该语言尚无桥接修复器
         grouped.setdefault((fossil.path, tool), set()).add(fossil.rule_id)
 
     commands: list[FixCommand] = []
@@ -95,16 +93,15 @@ def build_fix_plan(fossils: list[Fossil]) -> list[FixCommand]:
 
 
 def unbridged_languages(fossils: list[Fossil]) -> list[str]:
-    """List languages whose fix hints have no bridged fixer.
+    """列出带 fix_hint 但没有桥接修复器的语言.
 
-    Surfaced by the ``fix`` command so users are never left guessing why
-    hinted fossils produced no command.
+    由 ``fix`` 命令上报，用户不会困惑为什么带提示的化石没有产生命令.
 
     Args:
-        fossils: Fossils from a scan.
+        fossils: 扫描得到的化石.
 
     Returns:
-        Sorted language names that carry hints but are not bridged.
+        排序后的语言名列表.
     """
     hinted = {sniff_language(Path(fossil.path)) for fossil in fossils if fossil.fix_hint}
     return sorted(lang for lang in hinted if lang and lang not in FIXABLE_LANGUAGES)

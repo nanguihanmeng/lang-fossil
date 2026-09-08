@@ -1,4 +1,4 @@
-"""Entry point for ``python -m lang_fossil``."""
+"""``python -m lang_fossil`` 的入口."""
 
 from __future__ import annotations
 

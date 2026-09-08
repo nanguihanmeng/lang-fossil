@@ -1,4 +1,4 @@
-"""Stratification stage: aggregate fossils into strata and compute metrics."""
+"""地层聚合阶段：把化石聚合为地层并计算指标."""
 
 from __future__ import annotations
 
@@ -9,17 +9,17 @@ from lang_fossil.core.models import ERA_META, ERA_UNSAFE, ScanResult
 
 
 def compute_fossil_index(fossils: int, scanned_lines: int) -> float:
-    """Compute the Fossil Index: fossils per thousand lines of code.
+    """计算 Fossil Index：每千行代码的化石数.
 
     Args:
-        fossils: Number of fossils collected in a scan.
-        scanned_lines: Number of eligible source lines scanned.
+        fossils: 本次扫描收集的化石数.
+        scanned_lines: 扫描的有效源码行数.
 
     Returns:
-        The fossil index; ``0.0`` when ``scanned_lines`` is 0.
+        化石指数；``scanned_lines`` 为 0 时返回 0.0.
 
     Raises:
-        ValueError: If ``scanned_lines`` is negative.
+        ValueError: ``scanned_lines`` 为负.
     """
     if scanned_lines < 0:
         raise ValueError("scanned_lines must be non-negative")
@@ -30,7 +30,7 @@ def compute_fossil_index(fossils: int, scanned_lines: int) -> float:
 
 @dataclass(frozen=True)
 class EraStratum:
-    """One stratigraphic layer: fossils of a single era."""
+    """一个地层：单一时代的化石集合."""
 
     era: str
     fossil_count: int
@@ -39,7 +39,7 @@ class EraStratum:
 
 @dataclass(frozen=True)
 class StratigraphyReport:
-    """Aggregated, report-ready view of a scan."""
+    """聚合完成、可直接报告的扫描视图."""
 
     total_fossils: int
     unsafe_count: int
@@ -53,23 +53,22 @@ class StratigraphyReport:
     by_severity: dict[str, int]
     parse_errors: tuple[str, ...]
     clone_count: int
-    # Optional git-enrichment counters (all zero when dating is disabled).
+    # 可选 git 富化计数器（富化关闭时全为 0）.
     git_dated_fossils: int = 0
     active_fossils: int = 0
 
 
-# A fossil whose file was committed within this many years is "active": the
-# style-era says old code, git says it is still being maintained -- the era
-# vs. git dating drift the enrichment dimension exists to expose.
-# ponytail: fixed window; add a config knob if a tunable horizon is ever needed.
+# 化石所在文件最近 N 年内仍有提交，即"活跃遗留"：风格 era 说是老代码，
+# git 说它仍在被维护——这正是富化维度要暴露的年代错位.
+# ponytail: 固定窗口；如需可调地平线再加配置项.
 _RECENT_LEGACY_WINDOW_YEARS = 2
+# 非"遗留"地层：工具级诊断与审查项不参与活性计数.
 _NON_LEGACY_ERAS = frozenset({ERA_META, ERA_UNSAFE})
 
 
-# Chronological ordering for stratum display (oldest first). The python eras
-# come first, then per-language generation labels (newest language standards
-# last); unknown eras sort near the end alphabetically; "meta" (tool-level
-# findings such as unreadable files) is always the final stratum.
+# 地层展示的时间顺序（从老到新）。Python 时代标签在前，随后是各语言
+# 代际标签（越新的语言标准越靠后）；未知时代按字母序排在尾部；"meta"
+# （工具级发现，如不可读文件）永远是最后一层.
 _ERA_ORDER = {
     "paleozoic": 0,
     "mesozoic": 1,
@@ -82,33 +81,33 @@ _ERA_ORDER = {
     "cs1": 30,
     "cs8": 31,
     "java-legacy": 40,
-    ERA_UNSAFE: 85,  # review findings (never dated); ordered just before meta
+    ERA_UNSAFE: 85,  # 审查发现（不断代）；排在 meta 之前
     ERA_META: 90,
 }
 _ERA_UNKNOWN = 80
 
 
 def _module_of(path: str) -> str:
-    """Map a file path to its nearest "module" bucket (top directory).
+    """把文件路径映射到最近的"模块"桶（顶层目录）.
 
     Args:
-        path: Repository-relative file path.
+        path: 仓库相对文件路径.
 
     Returns:
-        The first path segment (or the file name for root-level files).
+        首个路径段；根级文件返回文件名.
     """
     parts = path.split("/")
     return parts[0] if len(parts) > 1 else path
 
 
 def build_report(scan_result: ScanResult) -> StratigraphyReport:
-    """Aggregate a scan result into a stratigraphy report.
+    """把扫描结果聚合为地层报告.
 
     Args:
-        scan_result: Raw scan outcome.
+        scan_result: 原始扫描产物.
 
     Returns:
-        The aggregated report with era strata and per-bucket counters.
+        带地层层与各维度计数器的聚合报告.
     """
     fossils = scan_result.fossils
     by_era: dict[str, dict[str, int]] = {}
@@ -117,6 +116,7 @@ def build_report(scan_result: ScanResult) -> StratigraphyReport:
     by_severity: dict[str, int] = {}
     dated = 0
     active = 0
+    # 活性判定阈值：当前年 - 窗口年数.
     cutoff_year = date.today().year - _RECENT_LEGACY_WINDOW_YEARS
 
     for fossil in fossils:
@@ -145,7 +145,7 @@ def build_report(scan_result: ScanResult) -> StratigraphyReport:
 
     return StratigraphyReport(
         total_fossils=len(fossils),
-        unsafe_count=sum(1 for fossil in fossils if fossil.era == "unsafe"),
+        unsafe_count=sum(1 for fossil in fossils if fossil.era == ERA_UNSAFE),
         scanned_files=scan_result.scanned_files,
         scanned_lines=scan_result.scanned_lines,
         skipped_files=scan_result.skipped_files,

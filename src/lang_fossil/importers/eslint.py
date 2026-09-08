@@ -1,7 +1,6 @@
-"""eslint JSON report importer.
+"""eslint JSON 报告导入器.
 
-Parses the default eslint output format (an array of per-file result
-objects)::
+解析 eslint 默认输出格式（按文件结果对象的数组）::
 
     [
       {
@@ -22,22 +21,22 @@ from typing import Any
 
 from lang_fossil.importers import ExternalFinding, normalize_path
 
+# eslint severity 整数 -> 规范化严重级.
 _SEVERITY_BY_INT = {0: "info", 1: "warning", 2: "error"}
 
 
 def parse(content: str, root: Path) -> list[ExternalFinding]:
-    """Parse eslint JSON report text into findings.
+    """解析 eslint JSON 报告文本为 finding.
 
     Args:
-        content: Raw eslint output.
-        root: Repository root for path normalization.
+        content: eslint 原始输出.
+        root: 用于路径规范化的仓库根.
 
     Returns:
-        Normalized findings; malformed top-level entries are skipped so one
-        bad record never aborts the import.
+        规范化的 finding；畸形顶层条目跳过，单条坏记录不中断导入.
 
     Raises:
-        ValueError: If the content is not valid JSON or not an array.
+        ValueError: 内容不是合法 JSON 或不是数组.
     """
     try:
         results = json.loads(content)
@@ -59,7 +58,7 @@ def parse(content: str, root: Path) -> list[ExternalFinding]:
                 continue
             rule_id = message.get("ruleId")
             if not isinstance(rule_id, str):
-                continue  # fatal parse errors carry no rule id; not findings
+                continue  # 致命解析错误不带 ruleId，不算 finding
             findings.append(
                 ExternalFinding(
                     tool="eslint",
@@ -75,10 +74,10 @@ def parse(content: str, root: Path) -> list[ExternalFinding]:
 
 
 def _to_int(value: Any, default: int) -> int:
-    """Coerce a report field to int (0-based column handled by caller)."""
+    """把报告字段强转为 int（0 基列号由调用方处理）."""
     return value if isinstance(value, int) else default
 
 
 def _to_str(value: Any) -> str:
-    """Coerce a message field to str."""
+    """把 message 字段强转为 str."""
     return value if isinstance(value, str) else ""

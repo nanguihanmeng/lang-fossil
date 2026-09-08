@@ -1,9 +1,8 @@
-"""Rule loading and schema validation.
+"""规则加载与 schema 校验.
 
-Rules are YAML files loaded with ``yaml.safe_load`` only (injection
-mitigation) and validated against a pydantic whitelist schema: unknown
-fields, bad identifiers, or out-of-range severities are rejected at load
-time, not at scan time.
+规则是 YAML 文件，仅用 ``yaml.safe_load`` 加载（注入缓解），并经
+pydantic 白名单 schema 校验：未知字段、坏 id、越界 severity 都在加载
+期报错，而不是带病静默运行.
 """
 
 from __future__ import annotations
@@ -24,49 +23,46 @@ MatchKind = Literal["node", "name", "attribute", "string_prefix", "import", "reg
 
 
 class MatchSpec(BaseModel):
-    """How a rule matches the parsed tree or raw source."""
+    """规则匹配解析树或原始源码的方式."""
 
     model_config = ConfigDict(extra="forbid")
 
     kind: MatchKind
     target: str = Field(min_length=1)
-    prefix: str | None = None  # only for kind="string_prefix"
-    regex_flags: str | None = None  # only for kind="regex", e.g. "i"
+    prefix: str | None = None  # 仅 kind="string_prefix" 有效
+    regex_flags: str | None = None  # 仅 kind="regex" 有效，如 "i"
 
     @field_validator("prefix")
     @classmethod
     def _prefix_only_for_strings(cls, v: str | None) -> str | None:
-        """Reject ``prefix`` on non string-prefix rules."""
+        """拒绝在非 string-prefix 规则上使用 ``prefix``."""
         if v is not None:
             raise ValueError("'prefix' is only valid for kind='string_prefix'")
         return v
 
 
 class RuleSpec(BaseModel):
-    """A validated rule definition.
+    """一条已校验的规则定义.
 
     Attributes:
-        id: Rule identifier, e.g. ``PF001``.
-        language: Target language.
-        category: ``fossil`` for constructs removed/deprecated by a language
-            standard (age-datable), ``unsafe`` for bad-practice patterns that
-            are still legal today (never dated).
-        era: Stratigraphic era. Fossil rules use a language-generation label
-            (e.g. ``c99``, ``cpp17``); unsafe rules must use the reserved
-            ``unsafe`` era.
-        deprecated_in / removed_in: Optional standard version labels that
-            substantiate a fossil finding (e.g. ``"c++17"``, ``"c11"``). A
-            fossil rule must carry at least one; unsafe rules carry neither.
-        message: Human-readable finding description.
+        id: 规则标识，如 ``PF001``.
+        language: 目标语言.
+        category: ``fossil`` 表示被语言标准移除/废弃的构造（可断代），
+            ``unsafe`` 表示至今仍合法的不良实践（永不断代）.
+        era: 地层时代。fossil 规则使用语言代际标签（如 ``c99``、
+            ``cpp17``）；unsafe 规则必须使用保留 ``unsafe`` era.
+        deprecated_in / removed_in: 佐证化石判定的可选标准版本标签
+            （如 ``"c++17"``、``"c11"``）。fossil 至少其一必填；unsafe
+            两者皆禁.
+        message: 面向用户的发现描述.
         severity: ``info`` / ``warning`` / ``error``.
-        provenance: Source of the rule; maps it to the existing lint
-            ecosystem (e.g. ``pyupgrade``, ``eslint (no-var)``, ``internal``).
-        source: Optional official reference URL (standard/library docs)
-            substantiating the removal/deprecation claim.
-        fix_hint: Optional hint consumed by the ``--fix`` bridge.
-        match: Matching specification.
-        match_mode: ``ast`` requires a real parse tree; ``heuristic`` rules
-            run on raw lines (used for JS and pre-2.7 Python corpora).
+        provenance: 规则来源；映射到现有 lint 生态（如 ``pyupgrade``、
+            ``eslint (no-var)``、``internal``）.
+        source: 可选的官方引用 URL，佐证移除/废弃结论.
+        fix_hint: 可选提示，供 ``--fix`` 桥接消费.
+        match: 匹配规格.
+        match_mode: ``ast`` 需要真实解析树；``heuristic`` 在源码行上
+            运行（JS 与 Py2 之前的语料使用）.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -88,24 +84,23 @@ class RuleSpec(BaseModel):
     @field_validator("id")
     @classmethod
     def _validate_id(cls, v: str) -> str:
-        """Enforce a strict, greppable rule-id format."""
+        """强制严格、可 grep 的规则 id 格式."""
         if not _RULE_ID_PATTERN.match(v):
             raise ValueError(f"rule id {v!r} must match {_RULE_ID_PATTERN.pattern}")
         return v
 
     @model_validator(mode="after")
     def _guard_category_consistency(self) -> RuleSpec:
-        """Enforce category/era/version coherence.
+        """强制 category/era/版本的一致性.
 
-        A rule must never masquerade as an age-datable fossil when it detects
-        something that is still legal (the historical false-conclusion bug);
-        conversely a fossil must be substantiated by a version label.
+        检测"至今合法"事物的规则绝不能冒充可断代的化石（历史性错误
+        结论）；反之化石必须有版本标签佐证.
 
         Returns:
-            The validated rule.
+            校验通过的规则.
 
         Raises:
-            ValueError: On category/era/version mismatches.
+            ValueError: category/era/版本不匹配.
         """
         has_version = self.deprecated_in is not None or self.removed_in is not None
         if self.category == ERA_UNSAFE:
@@ -122,13 +117,13 @@ class RuleSpec(BaseModel):
 
 
 class RuleRegistry:
-    """Immutable collection of validated rules."""
+    """不可变的已校验规则集合."""
 
     def __init__(self, rules: list[RuleSpec]) -> None:
-        """Store rules indexed by language.
+        """按语言索引存储规则.
 
         Args:
-            rules: Validated rule specs (duplicate ids are rejected).
+            rules: 已校验的规则列表（重复 id 会被拒绝）.
         """
         seen: set[str] = set()
         for rule in rules:
@@ -142,49 +137,49 @@ class RuleRegistry:
 
     @classmethod
     def load_builtin(cls) -> RuleRegistry:
-        """Load rules bundled with the package.
+        """加载随包分发的规则.
 
         Returns:
-            A registry containing all builtin rule packs.
+            包含全部内置规则包的注册表.
 
         Raises:
-            ValueError: If any builtin file fails schema validation.
+            ValueError: 任一内置文件未通过 schema 校验.
         """
         return cls.load_from_dir(Path(__file__).parent / "builtin")
 
     @classmethod
     def load_from_dir(cls, directory: Path) -> RuleRegistry:
-        """Load every ``*.yaml`` / ``*.yml`` rule pack under a directory.
+        """加载目录下全部 ``*.yaml`` / ``*.yml`` 规则包.
 
         Args:
-            directory: Root of a rule pack tree (``language/pack.yaml``).
+            directory: 规则包树根（``language/pack.yaml``）.
 
         Returns:
-            A registry of all valid rules found.
+            所有合法规则的注册表.
 
         Raises:
-            ValueError: If a file fails to parse or validate; loading is
-                fail-fast so a broken rule pack never scans silently.
+            ValueError: 任一文件解析或校验失败；加载 fail-fast，损坏的
+                规则包绝不静默扫描.
         """
         rules: list[RuleSpec] = []
         for path in sorted(directory.rglob("*.y*ml")):
             if "samples" in path.parts:
-                continue  # sample corpora are consumed by tests, not loaded as rules
+                continue  # 样本语料供测试消费，不作为规则加载
             rules.extend(cls._load_file(path))
         return cls(rules)
 
     @staticmethod
     def _load_file(path: Path) -> list[RuleSpec]:
-        """Load and validate a single YAML rule pack.
+        """加载并校验单个 YAML 规则包.
 
         Args:
-            path: Path to the YAML file.
+            path: YAML 规则包路径.
 
         Returns:
-            The validated rules inside it.
+            其中全部已校验规则.
 
         Raises:
-            ValueError: On YAML syntax errors or schema violations.
+            ValueError: YAML 语法错误或 schema 违规.
         """
         try:
             raw = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -202,20 +197,20 @@ class RuleRegistry:
         return rules
 
     def for_language(self, language: str) -> list[RuleSpec]:
-        """Return all rules registered for a language.
+        """返回某语言注册的全部规则.
 
         Args:
-            language: Sniffed language name.
+            language: 嗅探出的语言名.
 
         Returns:
-            Rules for that language (possibly empty).
+            该语言的规则（可能为空）.
         """
         return self._by_language.get(language, [])
 
     def __iter__(self) -> Iterator[RuleSpec]:
-        """Iterate over all rules."""
+        """遍历全部规则."""
         return iter(self._rules)
 
     def __len__(self) -> int:
-        """Return the number of rules."""
+        """返回规则总数."""
         return len(self._rules)

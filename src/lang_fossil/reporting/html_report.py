@@ -1,11 +1,10 @@
-"""Self-contained HTML report (data/view separation, v1.1 verdict).
+"""自包含 HTML 报告（数据/视图分离，v1.1 结论）.
 
-Default shape: a single HTML file with the canonical JSON embedded in a
-``<script type="application/json">`` block; the summary tables are rendered
-server-side via Jinja2, and the embedded JSON stays independently
-exportable for ``diff`` and archival. ``--no-embed`` writes a shell page
-plus a sibling ``report.json`` (http preview only — ``file://`` fetch of
-local JSON is blocked by browser CORS policy).
+默认形态：单个 HTML 文件，规范 JSON 内嵌在
+``<script type="application/json">`` 块中；汇总表格由 Jinja2 在服务端
+渲染，内嵌 JSON 保持独立可导出（供 ``diff`` 与归档）。``--no-embed``
+写外壳页加同级 ``report.json``（仅限 http 预览——``file://`` 读取本地
+JSON 会被浏览器 CORS 拦截）.
 """
 
 from __future__ import annotations
@@ -23,26 +22,24 @@ from lang_fossil.reporting.json_report import build_document
 
 
 def _script_json(payload: Any) -> Markup:
-    r"""Render a JSON payload safe for a ``<script>`` data block.
+    r"""把 JSON 载荷渲染为 ``<script>`` 数据块安全的内容.
 
-    Script contents are raw text: HTML autoescape would corrupt the JSON
-    (quotes become ``&#34;``) and the browser does not decode entities there,
-    so the payload is marked safe after neutralising the only dangerous
-    sequence — ``<``, which becomes ``\u003c`` (semantically identical after
-    JSON parsing but unable to close the script element).
+    script 内容是原始文本：HTML autoescape 会破坏 JSON（引号变
+    ``&#34;``）且浏览器不做实体解码，因此在中和唯一危险序列——``<`` 变
+    ``\u003c``（JSON 解析后语义等价，但无法闭合 script 元素）——后标记
+    为安全.
     """
     escaped = json.dumps(payload, ensure_ascii=False).replace("<", "\\u003c")
-    return Markup(escaped)  # noqa: S704 - safe by construction, see docstring
+    return Markup(escaped)  # noqa: S704 - 构造上安全，见 docstring
 
 
 def _js_string(value: str) -> Markup:
-    r"""Render a string as a safe JS/JSON string literal for ``<script>``.
+    r"""把字符串渲染为 ``<script>`` 内安全的 JS/JSON 字符串字面量.
 
-    ``"`` is JSON-escaped and ``<`` is neutralised, so the value cannot
-    terminate the script element.
+    ``"`` 做 JSON 转义、``<`` 被中和，值不可能终止 script 元素.
     """
     escaped = json.dumps(value, ensure_ascii=False).replace("<", "\\u003c")
-    return Markup(escaped)  # noqa: S704 - safe by construction, see docstring
+    return Markup(escaped)  # noqa: S704 - 构造上安全，见 docstring
 
 
 _TEMPLATE = """<!DOCTYPE html>
@@ -135,10 +132,10 @@ fetch(href).then(r => r.json()).then(data => {
 
 
 def _environment() -> Environment:
-    """Create the Jinja2 environment with autoescaping enabled.
+    """创建开启 autoescape 的 Jinja2 环境.
 
     Returns:
-        A configured Jinja2 environment.
+        配置好的 Jinja2 环境.
     """
     return Environment(autoescape=select_autoescape(["html"]), trim_blocks=True)
 
@@ -151,18 +148,18 @@ def write_report(
     *,
     embed_data: bool = True,
 ) -> Path:
-    """Write the HTML report to disk.
+    """把 HTML 报告写入磁盘.
 
     Args:
-        scan_result: Raw scan outcome.
-        report: Aggregated stratigraphy report.
-        root: Scan root directory.
-        output: Output file path.
-        embed_data: When False, write a shell page plus sibling
-            ``<stem>.json`` data file instead of a self-contained page.
+        scan_result: 原始扫描产物.
+        report: 聚合的地层报告.
+        root: 扫描根目录.
+        output: 输出文件路径.
+        embed_data: False 时写外壳页加同级 ``<stem>.json`` 数据文件，
+            而非自包含页面.
 
     Returns:
-        The written HTML path.
+        写入的 HTML 路径.
     """
     document = build_document(scan_result, report, root)
     output.parent.mkdir(parents=True, exist_ok=True)

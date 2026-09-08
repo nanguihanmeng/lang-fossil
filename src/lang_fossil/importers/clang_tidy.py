@@ -1,13 +1,12 @@
-"""clang-tidy text diagnostic importer.
+"""clang-tidy 文本诊断导入器.
 
-Parses clang-tidy's stable textual diagnostic format (one finding per
-line). The typical shape is::
+解析 clang-tidy 稳定的文本诊断格式（每行一条 finding），典型形状::
 
     src/main.cpp:12:3: warning: 'auto_ptr' is deprecated [deprecated-declarations]
     src/main.cpp:12:3: note: 'auto_ptr' has been explicitly marked deprecated here
 
-Notes/remarks are not findings (they annotate the main diagnostic); only
-``error``/``warning`` records become findings.
+note/remark 不是 finding（它们注释主诊断）；只有 ``error``/``warning``
+记录成为 finding.
 """
 
 from __future__ import annotations
@@ -17,20 +16,19 @@ from pathlib import Path
 
 from lang_fossil.importers import ExternalFinding, normalize_path
 
-# path:line:col: severity: message [rule-name]
+# 路径:行:列: severity: message [rule-name]
 _DIAGNOSTIC_RE = re.compile(r"^(.+?):(\d+):(\d+):\s+(error|warning):\s*(.*?)(?:\s+\[([\w.-]+)\])?$")
 
 
 def parse(content: str, root: Path) -> list[ExternalFinding]:
-    """Parse clang-tidy textual diagnostics into findings.
+    """解析 clang-tidy 文本诊断为 finding.
 
     Args:
-        content: Raw clang-tidy output.
-        root: Repository root for path normalization.
+        content: clang-tidy 原始输出.
+        root: 用于路径规范化的仓库根.
 
     Returns:
-        Normalized findings; lines that do not match the diagnostic shape
-        (e.g. notes, build logs) are skipped.
+        规范化的 finding；不匹配诊断形状的行（如 note、构建日志）跳过.
     """
     findings: list[ExternalFinding] = []
     for line in content.splitlines():

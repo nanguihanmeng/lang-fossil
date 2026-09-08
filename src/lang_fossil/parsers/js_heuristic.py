@@ -1,7 +1,7 @@
-"""Heuristic JavaScript front end (thin wrapper over :class:`HeuristicParser`).
+"""启发式 JavaScript 前端（:class:`HeuristicParser` 的薄封装）.
 
-Kept as a distinct class so existing imports and the JS-specific docstring
-semantics stay stable; behaviour is identical to the generic heuristic parser.
+保留独立类名以维持既有导入路径与 JS 专属文档语义；行为与通用启发式
+解析器完全一致.
 """
 
 from __future__ import annotations
@@ -10,8 +10,8 @@ from lang_fossil.parsers.heuristic import HeuristicParser
 
 
 class JsHeuristicParser(HeuristicParser):
-    """Regex-level JS "parser" (no AST)."""
+    """正则级 JS"解析器"（无 AST）."""
 
     def __init__(self) -> None:
-        """Bind the parser to the JavaScript language."""
+        """把解析器绑定到 JavaScript 语言."""
         super().__init__("javascript")

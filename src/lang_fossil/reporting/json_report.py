@@ -1,7 +1,7 @@
-"""Canonical JSON report writer.
+"""规范 JSON 报告写入器.
 
-The JSON document is the single source of truth: HTML reports embed it
-verbatim (data/view separation) and the ``diff`` command consumes it.
+JSON 文档是唯一事实源：HTML 报告原样内嵌（数据/视图分离），``diff``
+命令反向消费它.
 """
 
 from __future__ import annotations
@@ -19,15 +19,15 @@ from lang_fossil.core.stratigraphy import StratigraphyReport
 def build_document(
     scan_result: ScanResult, report: StratigraphyReport, root: Path
 ) -> dict[str, Any]:
-    """Assemble the canonical JSON document.
+    """组装规范的 JSON 文档.
 
     Args:
-        scan_result: Raw scan outcome.
-        report: Aggregated stratigraphy report.
-        root: Scan root directory.
+        scan_result: 原始扫描产物.
+        report: 聚合的地层报告.
+        root: 扫描根目录.
 
     Returns:
-        A JSON-serializable dict.
+        可 JSON 序列化的字典.
     """
     return {
         "tool": {"name": "lang-fossil", "version": __version__},
@@ -59,16 +59,16 @@ def build_document(
 def write_report(
     scan_result: ScanResult, report: StratigraphyReport, root: Path, output: Path
 ) -> Path:
-    """Write the JSON report to disk.
+    """把 JSON 报告写入磁盘.
 
     Args:
-        scan_result: Raw scan outcome.
-        report: Aggregated stratigraphy report.
-        root: Scan root directory.
-        output: Output file path.
+        scan_result: 原始扫描产物.
+        report: 聚合的地层报告.
+        root: 扫描根目录.
+        output: 输出文件路径.
 
     Returns:
-        The written path.
+        写入的路径.
     """
     output.parent.mkdir(parents=True, exist_ok=True)
     document = build_document(scan_result, report, root)

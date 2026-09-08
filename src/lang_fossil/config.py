@@ -1,10 +1,10 @@
-"""Unified configuration for lang-fossil.
+"""lang-fossil 的统一配置.
 
-All configuration reads converge here (single exit point); business modules
-only receive an injected :class:`LangFossilSettings` instance.
+所有配置读取收敛于此（唯一出口）；业务模块只接收注入的
+:class:`LangFossilSettings` 实例.
 
-Precedence (high to low): CLI args > environment variables > TOML
-``[tool.lang-fossil]`` section > model defaults.
+优先级（高到低）：CLI 参数 > 环境变量 > TOML ``[tool.lang-fossil]`` 节 >
+模型默认值.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal, Union, get_args, get_origin
 
-try:  # PEP 604 unions (``X | None``) exist at runtime only on Python >= 3.10
+try:  # PEP 604 联合类型（``X | None``）仅在 Python >= 3.10 运行时存在
     from types import UnionType as _PEP604Union
 except ImportError:  # pragma: no cover - Python < 3.10
     _PEP604Union = ()  # type: ignore[assignment,misc]
@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - Python < 3.10
 from pydantic import BaseModel, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# 默认排除目录.
 _DEFAULT_EXCLUDES = [
     "node_modules",
     ".venv",
@@ -33,24 +34,20 @@ _DEFAULT_EXCLUDES = [
 
 
 class CacheSettings(BaseModel):
-    """Cache subsystem parameters."""
+    """缓存子系统参数."""
 
     enabled: bool = True
     path: Path = Path(".lang-fossil/cache.db")
-    timeout_seconds: float = Field(
-        default=5.0, gt=0, description="Per-file parse circuit-breaker threshold"
-    )
+    timeout_seconds: float = Field(default=5.0, gt=0, description="单文件解析熔断阈值")
 
 
 class AmbiguousHeaderSettings(BaseModel):
-    """Policy for resolving the ambiguous C/C++ ``.h`` extension.
+    """C/C++ 共用 ``.h`` 扩展名的判定策略.
 
-    ``.h`` is shared by C and C++; no content scoring is performed. The user
-    decides explicitly: ``mode`` applies everywhere unless a matching glob in
-    ``overrides`` (matched against the repository-relative path) wins. In
-    ``auto`` mode the sibling directory is consulted: the family with more
-    ``.c``/``.cpp``(.cc/.cxx) sources wins, defaulting to ``c`` when the
-    directory has no C-family sources.
+    不做内容评分，由用户显式决定：``mode`` 全局生效，``overrides`` 中
+    匹配（按仓库相对路径）的 glob 优先。``auto`` 模式参考同级目录：谁的
+    ``.c``/``.cpp``(.cc/.cxx) 源文件多就判谁；目录内无 C 家族源文件时
+    默认 ``c``.
     """
 
     mode: Literal["auto", "c", "cpp"] = "auto"
@@ -58,7 +55,7 @@ class AmbiguousHeaderSettings(BaseModel):
 
 
 class ScanSettings(BaseModel):
-    """Scan pipeline parameters."""
+    """扫描管线参数."""
 
     workers: int = Field(default=0, ge=0, le=16, description="0 = min(CPU, 8)")
     exclude: list[str] = Field(default_factory=lambda: list(_DEFAULT_EXCLUDES))
@@ -68,19 +65,18 @@ class ScanSettings(BaseModel):
 
 
 class GitSettings(BaseModel):
-    """Enrichment via git (optional module; see PRD FR-5)."""
+    """通过 git 做富化（可选模块；见 PRD FR-5）."""
 
-    enabled: bool = False  # review verdict: carbon dating is opt-in
+    enabled: bool = False  # 评审结论：碳定年默认关闭
     blame_batch: int = 200
     treat_squash_as_unreliable: bool = True
 
 
 class LangFossilSettings(BaseSettings):
-    """Root settings.
+    """根设置.
 
-    Precedence: CLI args > env vars > TOML > defaults. Environment variables
-    use the ``LANG_FOSSIL_`` prefix with ``__`` as the nested delimiter, e.g.
-    ``LANG_FOSSIL_SCAN__WORKERS=8``.
+    优先级：CLI > 环境变量 > TOML > 默认值。环境变量使用 ``LANG_FOSSIL_``
+    前缀，``__`` 作为嵌套分隔符，例如 ``LANG_FOSSIL_SCAN__WORKERS=8``.
     """
 
     model_config = SettingsConfigDict(
@@ -92,38 +88,37 @@ class LangFossilSettings(BaseSettings):
     cache: CacheSettings = CacheSettings()
     scan: ScanSettings = ScanSettings()
     git: GitSettings = GitSettings()
-    max_fossil_index: float | None = Field(default=None, ge=0)  # CI gate threshold
+    max_fossil_index: float | None = Field(default=None, ge=0)  # CI 门禁阈值
 
     @field_validator("max_fossil_index")
     @classmethod
     def _guard_threshold(cls, v: float | None) -> float | None:
-        """Reject negative thresholds early with a readable message."""
+        """提前拒绝负阈值并给出可读报错."""
         if v is not None and v < 0:
             raise ValueError("--max-fi must be >= 0")
         return v
 
 
 class ConfigError(Exception):
-    """Raised when configuration cannot be loaded or validated."""
+    """配置无法加载或校验失败时抛出."""
 
 
 def read_tool_section(toml_path: Path) -> dict[str, Any]:
-    """Read the ``[tool.lang-fossil]`` table from a TOML file.
+    """读取 TOML 文件中的 ``[tool.lang-fossil]`` 表.
 
-    Namespace isolation: only the ``tool.lang-fossil`` table is extracted.
-    Other ``[tool.*]`` sections in the user's file (``[tool.black]``, ...)
-    never enter the pydantic model, so ``extra="forbid"`` is not affected by
-    them.
+    命名空间隔离：只提取 ``tool.lang-fossil`` 表。用户文件中其余
+    ``[tool.*]`` 节（``[tool.black]`` 等）不进入 pydantic 模型，
+    因此不会触碰 ``extra="forbid"``.
 
     Args:
-        toml_path: Path to the TOML file (typically ``pyproject.toml``).
+        toml_path: TOML 文件路径（通常是 ``pyproject.toml``）.
 
     Returns:
-        The parsed ``[tool.lang-fossil]`` table, or an empty dict when the
-        file is missing or has no such section (graceful degradation).
+        解析出的 ``[tool.lang-fossil]`` 表；文件缺失或无该节时返回
+        空字典（优雅降级）.
 
     Raises:
-        ConfigError: If the file exists but is not valid TOML.
+        ConfigError: 文件存在但不是合法 TOML.
     """
     try:
         content = toml_path.read_text(encoding="utf-8")
@@ -139,30 +134,30 @@ def read_tool_section(toml_path: Path) -> dict[str, Any]:
 
 
 def _parse_toml(content: str, toml_path: Path) -> dict[str, Any]:
-    """Parse TOML content using the best parser available.
+    """使用当前解释器可用的最佳解析器解析 TOML.
 
     Args:
-        content: Raw TOML text.
-        toml_path: Path used only for error messages.
+        content: TOML 原文.
+        toml_path: 仅用于报错的文件路径.
 
     Returns:
-        The parsed TOML document.
+        解析后的 TOML 文档.
 
     Raises:
-        ConfigError: If the content is invalid TOML.
+        ConfigError: TOML 非法.
     """
     try:  # Python 3.11+
         import tomllib
     except ImportError:
-        try:  # optional backport, not a hard dependency
+        try:  # 可选 backport，非硬依赖
             import tomli as tomllib
         except ImportError:
-            # No TOML parser on this interpreter: degrade to defaults.
+            # 解释器上没有 TOML 解析器：降级为默认值.
             return {}
 
     try:
         parsed: dict[str, Any] = tomllib.loads(content)
-    except Exception as exc:  # noqa: BLE001 - tomllib raises ValueError subclasses
+    except Exception as exc:  # noqa: BLE001 - tomllib 抛 ValueError 子类
         raise ConfigError(f"Invalid TOML in {toml_path}: {exc}") from exc
     return parsed
 
@@ -171,21 +166,21 @@ def load_settings(
     cli_overrides: dict[str, Any] | None = None,
     toml_path: Path | None = None,
 ) -> LangFossilSettings:
-    """Load settings from TOML, environment, and CLI overrides.
+    """从 TOML、环境变量与 CLI 覆盖加载设置.
 
-    Values are merged explicitly in precedence order (CLI > env > TOML >
-    defaults) before a single pydantic validation pass.
+    按优先级显式合并（CLI > 环境变量 > TOML > 默认值）后做单次 pydantic
+    校验.
 
     Args:
-        cli_overrides: Explicit CLI arguments; win over everything.
-        toml_path: Path to a config file with a ``[tool.lang-fossil]``
-            section; defaults to ``pyproject.toml`` in the working directory.
+        cli_overrides: 显式 CLI 参数；优先于一切.
+        toml_path: 含 ``[tool.lang-fossil]`` 节的配置文件路径；默认为
+            工作目录下的 ``pyproject.toml``.
 
     Returns:
-        A fully validated settings object.
+        完成校验的设置对象.
 
     Raises:
-        ConfigError: On unknown keys or out-of-range values.
+        ConfigError: 出现未知键或越界值.
     """
     toml_conf = read_tool_section(toml_path or Path("pyproject.toml"))
     env_conf = _env_overrides()
@@ -204,18 +199,18 @@ _TRUE_VALUES = {"1", "true", "yes", "on"}
 
 
 def _env_overrides() -> dict[str, Any]:
-    """Collect ``LANG_FOSSIL_*`` environment overrides as nested dicts.
+    """收集 ``LANG_FOSSIL_*`` 环境变量覆盖，组织为嵌套字典.
 
-    Only scalar fields are honored (bool/int/float/str); keys follow the
-    ``LANG_FOSSIL_SECTION__FIELD`` double-underscore nesting convention.
+    仅接受标量字段（bool/int/float/str）；键遵循
+    ``LANG_FOSSIL_SECTION__FIELD`` 双下划线嵌套约定.
 
     Returns:
-        A nested dict suitable for deep-merging into the model kwargs.
+        适合深合并进模型 kwargs 的嵌套字典.
     """
     overrides: dict[str, Any] = {}
 
     def _walk(model: type[BaseModel], path: list[str]) -> None:
-        """Walk model fields recursively, collecting scalar env values."""
+        """递归遍历模型字段，收集标量环境变量值."""
         for name, field_info in model.model_fields.items():
             annotation = field_info.annotation
             env_key = _ENV_PREFIX + "__".join([*path, name]).upper()
@@ -236,12 +231,12 @@ def _env_overrides() -> dict[str, Any]:
 
 
 def _set_nested(target: dict[str, Any], path: list[str], value: Any) -> None:
-    """Set a value at a nested path, creating intermediate dicts.
+    """在嵌套路径上设值，必要时创建中间字典.
 
     Args:
-        target: Dict mutated in place.
-        path: Field path segments (e.g. ``["scan", "workers"]``).
-        value: The coerced value.
+        target: 原地修改的目标字典.
+        path: 字段路径段（如 ``["scan", "workers"]``）.
+        value: 强转后的值.
     """
     node = target
     for segment in path[:-1]:
@@ -250,13 +245,13 @@ def _set_nested(target: dict[str, Any], path: list[str], value: Any) -> None:
 
 
 def _nested_model(annotation: Any) -> type[BaseModel] | None:
-    """Return the nested BaseModel type if the annotation is one.
+    """若注解是嵌套 BaseModel 则返回其类型.
 
     Args:
-        annotation: A field annotation.
+        annotation: 字段注解.
 
     Returns:
-        The BaseModel subclass, or None for scalars/optionals.
+        BaseModel 子类；标量/可选类型返回 None.
     """
     origin = get_origin(annotation)
     target = origin if origin is not None else annotation
@@ -266,36 +261,36 @@ def _nested_model(annotation: Any) -> type[BaseModel] | None:
 
 
 def _to_bool(raw: str) -> bool:
-    """Interpret truthy env strings (1/true/yes/on)."""
+    """解释真值环境变量字符串（1/true/yes/on）."""
     return raw.strip().lower() in _TRUE_VALUES
 
 
 def _to_int(raw: str) -> int:
-    """Parse an int env value.
+    """解析整数环境变量.
 
     Args:
-        raw: Raw environment value.
+        raw: 原始环境变量值.
 
     Returns:
-        The parsed integer.
+        解析出的整数.
 
     Raises:
-        ValueError: When ``raw`` is not an integer.
+        ValueError: ``raw`` 不是整数.
     """
     return int(raw)
 
 
 def _to_float(raw: str) -> float:
-    """Parse a float env value.
+    """解析浮点环境变量.
 
     Args:
-        raw: Raw environment value.
+        raw: 原始环境变量值.
 
     Returns:
-        The parsed float.
+        解析出的浮点数.
 
     Raises:
-        ValueError: When ``raw`` is not a number.
+        ValueError: ``raw`` 不是数字.
     """
     return float(raw)
 
@@ -309,22 +304,21 @@ _CONVERTERS: dict[type, Callable[[str], Any]] = {
 
 
 def _coerce(raw: str, annotation: Any) -> Any:
-    """Coerce an env string to the annotated scalar type.
+    """把环境变量字符串强转为注解标量类型.
 
-    Optional/Union annotations are unwrapped to their scalar member so e.g.
-    ``LANG_FOSSIL_MAX_FOSSIL_INDEX`` (a ``float | None`` field) works.
-    Converter failures propagate as :class:`ValueError` so the caller can turn
-    them into a loud ``ConfigError`` instead of silently ignoring the value.
+    Optional/Union 注解会解包到其标量成员，使 ``LANG_FOSSIL_MAX_FOSSIL_INDEX``
+    （``float | None`` 字段）生效。强转失败以 :class:`ValueError` 传播，
+    由调用方转为显式 ``ConfigError`` 而非静默忽略.
 
     Args:
-        raw: Raw environment value.
-        annotation: Target annotation.
+        raw: 原始环境变量值.
+        annotation: 目标注解.
 
     Returns:
-        The coerced value, or None when the type is unsupported (e.g. a list).
+        强转后的值；类型不支持（如 list）时返回 None.
 
     Raises:
-        ValueError: When the raw value cannot be parsed for a scalar type.
+        ValueError: 标量类型解析失败.
     """
     base = get_origin(annotation) or annotation
     converter = _CONVERTERS.get(base)
@@ -341,11 +335,11 @@ def _coerce(raw: str, annotation: Any) -> Any:
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> None:
-    """Recursively merge ``override`` into ``base`` (nested dicts unite).
+    """递归把 ``override`` 合并进 ``base``（嵌套字典取并集）.
 
     Args:
-        base: Target dict mutated in place.
-        override: Values that win on conflict.
+        base: 原地修改的目标字典.
+        override: 冲突时胜出的值.
     """
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(base.get(key), dict):

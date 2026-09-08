@@ -1,4 +1,4 @@
-"""Discovery stage: directory walk, language sniffing, scan orchestration."""
+"""发现阶段：目录遍历、语言嗅探与扫描编排."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from lang_fossil.parsers.heuristic import HeuristicParser
 from lang_fossil.parsers.js_heuristic import JsHeuristicParser
 from lang_fossil.parsers.parso_py import ParsoPythonParser
 
-_BINARY_SNIFF_LEN = 1024
+_BINARY_SNIFF_LEN = 1024  # 二进制嗅探窗口大小
 
 
 def _resolve_header_language(
@@ -36,19 +36,18 @@ def _resolve_header_language(
     policy: AmbiguousHeaderSettings,
     family_counts: tuple[int, int],
 ) -> str:
-    """Resolve an ambiguous ``.h`` from configuration, not content scoring.
+    """按配置（而非内容评分）解析歧义 ``.h``.
 
-    Glob overrides win; otherwise the ``mode`` decides. In ``auto`` mode the
-    sibling directory's C-family tallies decide (more ``.cpp`` sources → cpp),
-    defaulting to ``c`` with no C-family siblings.
+    glob overrides 优先；否则由 ``mode`` 决定。``auto`` 模式参考同级目录
+    的 C 家族计数（``.cpp`` 源多则判 cpp），无同族默认 ``c``.
 
     Args:
-        relative: Repository-relative header path (glob matching target).
-        policy: Ambiguous-header policy from settings.
-        family_counts: ``(c_sources, cpp_sources)`` counted in the sibling dir.
+        relative: 歧义头文件的仓库相对路径（glob 匹配目标）.
+        policy: 设置中的歧义头策略.
+        family_counts: 同级目录的 ``(c 源数, cpp 源数)``.
 
     Returns:
-        ``"cpp"`` or ``"c"``.
+        ``"cpp"`` 或 ``"c"``.
     """
     for pattern, language in policy.overrides.items():
         if fnmatch.fnmatchcase(relative, pattern):
@@ -65,20 +64,19 @@ def _classify_candidate(
     settings: LangFossilSettings,
     family_counts: dict[Path, tuple[int, int]],
 ) -> FileEntry | None:
-    """Classify one candidate file into a scan entry, or ``None`` to skip.
+    """把一个候选文件分类为扫描条目，或返回 ``None`` 跳过.
 
-    A candidate is skipped when its language is unsupported, it is binary, or
-    deterministic sampling drops it. Ambiguous headers are resolved against
-    the configured policy.
+    语言不支持、二进制文件或被确定性采样丢弃的候选会被跳过；歧义
+    头文件按配置策略解析.
 
     Args:
-        path: Absolute candidate path.
-        base: Root used to compute the repository-relative entry path.
-        settings: Active settings.
-        family_counts: Per-directory C-family tallies for "auto" resolution.
+        path: 候选文件绝对路径.
+        base: 用于计算仓库相对路径的根.
+        settings: 当前设置.
+        family_counts: 供 "auto" 判定用的每目录 C 家族计数.
 
     Returns:
-        A file entry, or ``None`` when the file should be skipped.
+        文件条目；应跳过时为 ``None``.
     """
     language = sniff_language(path)
     if language is None:
@@ -104,37 +102,34 @@ def _classify_candidate(
 
 
 def discover(root: Path, settings: LangFossilSettings) -> tuple[list[FileEntry], int]:
-    """Walk a directory tree and collect scannable files.
+    """遍历目录树并收集可扫描文件.
 
-    Excluded directories come from settings; files are skipped when their
-    language is unsupported or the sniff window contains a null byte.
-    Ambiguous C/C++ headers (``.h``) are resolved by the configured
-    ``ambiguous_headers`` policy.
+    排除目录来自设置；语言不支持或嗅探窗口含空字节的文件跳过。歧义的
+    C/C++ 头文件（``.h``）按 ``ambiguous_headers`` 策略解析.
 
     Args:
-        root: Directory (or file) to scan.
-        settings: Active settings (exclusions, sampling, header policy).
+        root: 要扫描的目录（或文件）.
+        settings: 当前设置（排除项、采样、头文件策略）.
 
     Returns:
-        A tuple of (entries, skipped_count).
+        (条目列表, 跳过数) 元组.
     """
     root = root.resolve()
     base = root.parent if root.is_file() else root
     candidates: list[Path] = [root] if root.is_file() else []
     if root.is_dir():
-        # Prune excluded directories during the walk (avoids descending into
-        # node_modules-sized trees) instead of listing then dropping them.
+        # 遍历期剪枝排除目录（避免深入 node_modules 级目录树），
+        # 而不是先全列出再丢弃.
         exclude = set(settings.scan.exclude)
         for dirpath, dirnames, filenames in os.walk(root):
             dirnames[:] = sorted(d for d in dirnames if d not in exclude)
             for name in sorted(filenames):
                 path = Path(dirpath) / name
-                if name in exclude:  # e.g. a file literally named "build"
+                if name in exclude:  # 例如字面名为 "build" 的文件
                     continue
                 candidates.append(path)
 
-    # Per-directory C-family tallies feed "auto" header resolution. Headers
-    # are excluded from their own directory's tally.
+    # 每目录 C 家族计数供 "auto" 头文件判定；头文件不计入自身所在目录.
     family_counts: dict[Path, tuple[int, int]] = {}
     for path in candidates:
         suffix = path.suffix.lower()
@@ -157,7 +152,7 @@ def discover(root: Path, settings: LangFossilSettings) -> tuple[list[FileEntry],
 
 
 def _worker_count(settings: LangFossilSettings) -> int:
-    """Resolve the effective worker count (0 = min(CPU, 8))."""
+    """解析实际 worker 数（0 = min(CPU, 8)）."""
     if settings.scan.workers > 0:
         return settings.scan.workers
     return min(os.cpu_count() or 1, 8)
@@ -169,23 +164,23 @@ def scan(
     engine: Engine,
     cache: ScanCache | None = None,
 ) -> ScanResult:
-    """Run the full extraction pipeline over a directory.
+    """对一个目录运行完整提取管线.
 
     Args:
-        root: Directory (or file) to scan.
-        settings: Active settings.
-        engine: Configured rule engine.
-        cache: Optional content-hash cache.
+        root: 要扫描的目录（或文件）.
+        settings: 当前设置.
+        engine: 已配置的规则引擎.
+        cache: 可选的内容哈希缓存.
 
     Returns:
-        The aggregated scan result.
+        聚合的扫描结果.
     """
     entries, skipped = discover(root, settings)
     root = root.resolve()
     base = root.parent if root.is_file() else root
     digest = engine.rules_digest()
-    # Python has a tree front end; every other supported language is served by
-    # the generic line parser (JS keeps its documented subclass front end).
+    # Python 有树级前端；其余受支持语言走通用逐行解析器
+    # （JS 保留其文档化的子类前端）.
     parsers: dict[str, Callable[[str], ParseResult]] = {
         "python": ParsoPythonParser().parse,
     }
@@ -196,14 +191,13 @@ def scan(
     def process(
         entry: FileEntry,
     ) -> tuple[list[Fossil], int, str | None, str, tuple[str, ...]]:
-        """Parse and match one file, honoring the cache.
+        """解析并匹配一个文件，尊重缓存.
 
         Args:
-            entry: The file entry to process.
+            entry: 待处理的文件条目.
 
         Returns:
-            Fossils, source line count, cache key (None if disabled),
-            source text, and parse errors.
+            (化石列表, 源码行数, 缓存键[禁用时 None], 源码文本, 解析错误).
         """
         file_path = base / entry.path
         try:
@@ -231,8 +225,7 @@ def scan(
         key = ScanCache.make_key(source, digest) if cache else None
         cached = cache.get(key) if key and cache else None
         if cached is not None:
-            # Re-attach the path of the file we are scanning now: the cached
-            # fossils were produced for whatever file first stored this content.
+            # 重贴当前文件路径：缓存里的化石属于首次入库的那个文件.
             fossils = [Fossil(**{**item, "path": entry.path}) for item in cached["fossils"]]
             errors = tuple(f"{entry.path}: {e}" for e in cached.get("errors", ()))
             return fossils, len(source.splitlines()), key, source, errors
@@ -267,7 +260,7 @@ def scan(
     for entry, (fossils, n_lines, _key, source, errors) in zip(entries, outcomes):
         all_fossils.extend(fossils)
         scanned_lines += n_lines
-        if source and entry.language == "python":  # clone fingerprints run on Python only
+        if source and entry.language == "python":  # 克隆指纹仅针对 Python
             sources[entry.path] = source
         parse_errors.extend(errors)
 
@@ -289,24 +282,20 @@ def _date_fossils(
     settings: LangFossilSettings,
     fossils: list[Fossil],
 ) -> list[Fossil]:
-    """Attach each file's last-commit year to its fossils (opt-in git dating).
+    """把每个文件的最近提交年附加到其化石上（可选择的 git 定年）.
 
-    Dating runs once per scan (not per worker) after extraction; it is a no-op
-    when ``settings.git.enabled`` is False (the default), so the scan stays
-    zero-overhead and repository-agnostic unless explicitly enabled. Years are
-    content-independent, therefore never part of the cache key: fossils from a
-    cache hit are dated here just like freshly matched ones.
+    富化在提取之后每次扫描运行一次（不按 worker 执行）；``settings.git.enabled``
+    为 False（默认）时为空转，扫描零开销且与仓库无关。年份与内容无关，
+    因此不参与缓存键：缓存命中的化石与新匹配的一视同仁地在此定年.
 
     Args:
-        root: Scan root (git working-directory probe target).
-        entries: Scanned file entries (their ``path`` values are the lookup
-            keys returned by the enricher).
-        settings: Active settings carrying the git section.
-        fossils: Fossils produced by the scan, mutated via replacement.
+        root: 扫描根目录（git 工作目录探测目标）.
+        entries: 已扫描的文件条目（其 ``path`` 是 enricher 返回映射的键）.
+        settings: 携带 git 节的当前设置.
+        fossils: 本次扫描产出的化石，经替换回填.
 
     Returns:
-        Fossils with ``last_commit_year`` populated, or the input unchanged
-        when git dating is disabled or yields no data.
+        已填 ``last_commit_year`` 的化石；git 定年关闭或无数据时原样返回.
     """
     if not settings.git.enabled or not fossils or not entries:
         return fossils
@@ -319,16 +308,16 @@ def _date_fossils(
 def _detect_clones_if_possible(
     entries: list[FileEntry], sources: dict[str, str]
 ) -> list[CloneMatch]:
-    """Run clone fingerprinting over Python sources.
+    """对 Python 源码运行克隆指纹检测.
 
     Args:
-        entries: Scanned file entries.
-        sources: In-memory sources keyed by relative path.
+        entries: 已扫描的文件条目.
+        sources: 按相对路径驻留内存的源码.
 
     Returns:
-        Clone matches across files (empty when fewer than two files).
+        跨文件克隆匹配（不足两个文件时为空）.
     """
-    if len(sources) < 2:  # noqa: PLR2004 - a clone needs two files by definition
+    if len(sources) < 2:  # noqa: PLR2004 - 克隆按定义需要两个文件
         return []
     from lang_fossil.core.clone import detect_clones
 

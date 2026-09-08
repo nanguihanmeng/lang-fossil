@@ -1,4 +1,4 @@
-"""lang-fossil CLI: dig / check / diff / rules / annotate / fix."""
+"""lang-fossil CLI：dig / check / diff / rules / annotate / fix."""
 
 from __future__ import annotations
 
@@ -39,6 +39,7 @@ app = typer.Typer(
 console = Console()
 err_console = Console(stderr=True)
 
+# 公共选项定义（避免重复）.
 Formats = typer.Option("table", "--format", "-f", help="Output format: table, json, html, sarif.")
 OutputOpt = typer.Option(None, "--output", "-o", help="Output file path.")
 WorkersOpt = typer.Option(None, "--workers", "-w", min=0, max=16, help="Worker threads (0 = auto).")
@@ -47,13 +48,13 @@ NoEmbedOpt = typer.Option(False, "--no-embed", help="HTML shell mode (http previ
 
 
 def _load_engine() -> Engine:
-    """Build the default engine (builtin rules + offline zombie DB).
+    """构建默认引擎（内置规则 + 离线僵尸数据库）.
 
     Returns:
-        A configured engine.
+        配置好的引擎.
 
     Raises:
-        ConfigError: If builtin rule packs or the snapshot are invalid.
+        ConfigError: 内置规则包或快照非法.
     """
     try:
         registry = RuleRegistry.load_builtin()
@@ -68,20 +69,19 @@ def _run_scan(
     workers: int | None,
     no_cache: bool,
 ) -> tuple[ScanResult, StratigraphyReport, LangFossilSettings]:
-    """Execute a scan with settings resolved from config + CLI overrides.
+    """以"配置 + CLI 覆盖"解析出的设置执行扫描.
 
     Args:
-        path: Scan root.
-        workers: CLI worker override (None = defer to config).
-        no_cache: Disable caching for this run.
+        path: 扫描根.
+        workers: CLI worker 覆盖（None = 遵循配置）.
+        no_cache: 本次运行禁用缓存.
 
     Returns:
-        Tuple of (scan result, stratigraphy report, active settings).
-        The settings are returned so callers can reflect opt-in features
-        (e.g. git enrichment) in their output.
+        (扫描结果, 地层报告, 当前设置) 三元组。返回设置是为了让调用方
+        在输出中体现可选功能（如 git 富化）.
 
     Raises:
-        ConfigError: On invalid configuration.
+        ConfigError: 配置非法.
     """
     overrides: dict[str, Any] = {}
     if workers is not None:
@@ -105,12 +105,12 @@ def _run_scan(
 
 
 def _print_table(report: StratigraphyReport, git_enabled: bool = False) -> None:
-    """Render a human-readable stratigraphy table.
+    """渲染人类可读的地层表.
 
     Args:
-        report: Aggregated stratigraphy report.
-        git_enabled: Whether git enrichment was on for this scan; when on,
-            the recently-touched (active) legacy count is appended.
+        report: 聚合的地层报告.
+        git_enabled: 本次扫描是否开启 git 富化；开启时追加活性
+            （最近被维护的）遗留计数.
     """
     table = Table(title="lang-fossil stratigraphy")
     table.add_column("Era")
@@ -142,18 +142,18 @@ def dig(
     no_cache: bool = NoCacheOpt,
     no_embed: bool = NoEmbedOpt,
 ) -> None:
-    """Scan a repository and report its fossil record.
+    """扫描仓库并报告其化石记录.
 
     Args:
-        path: Directory or file to scan.
-        fmt: Report format (table, json, html, sarif).
-        output: Output file (defaults to stdout for json, table always prints).
-        workers: Worker override.
-        no_cache: Disable cache.
-        no_embed: HTML shell mode.
+        path: 目录或文件.
+        fmt: 报告格式（table, json, html, sarif）.
+        output: 输出文件（json 默认 stdout；table 始终打印）.
+        workers: worker 覆盖.
+        no_cache: 禁用缓存.
+        no_embed: HTML 外壳模式.
 
     Raises:
-        typer.Exit: On config errors (exit code 2).
+        typer.Exit: 配置错误（退出码 2）.
     """
     try:
         result, report, settings = _run_scan(path, workers, no_cache)
@@ -195,16 +195,16 @@ def check(
     ),
     no_cache: bool = NoCacheOpt,
 ) -> None:
-    """CI gate: exit 1 when the fossil budget is exceeded.
+    """CI 门禁：超出化石预算时以退出码 1 失败.
 
     Args:
-        path: Directory or file to scan.
-        max_fi: Fossil-index threshold (per kLOC).
-        max_fossils: Absolute fossil count threshold.
-        no_cache: Disable cache.
+        path: 目录或文件.
+        max_fi: 化石指数阈值（每 kLOC）.
+        max_fossils: 化石总数阈值.
+        no_cache: 禁用缓存.
 
     Raises:
-        typer.Exit: 0 (pass), 1 (threshold exceeded), or 2 (config error).
+        typer.Exit: 0（通过）、1（超阈值）或 2（配置错误）.
     """
     try:
         _result, report, _settings = _run_scan(path, None, no_cache)
@@ -227,14 +227,14 @@ def diff(
     old: Path = typer.Argument(..., exists=True, help="Baseline JSON report."),
     new: Path = typer.Argument(..., exists=True, help="Current JSON report."),
 ) -> None:
-    """Compare two JSON reports: new and resolved fossils.
+    """对比两份 JSON 报告：新增与已解决的化石.
 
     Args:
-        old: Baseline report.
-        new: Current report.
+        old: 基线报告.
+        new: 当前报告.
 
     Raises:
-        typer.Exit: On malformed reports (exit code 2).
+        typer.Exit: 报告畸形（退出码 2）.
     """
     try:
         old_doc: dict[str, Any] = json.loads(old.read_text(encoding="utf-8"))
@@ -244,7 +244,7 @@ def diff(
         raise typer.Exit(EXIT_CONFIG) from exc
 
     def _keys(doc: dict[str, Any]) -> Counter[tuple[str, str, int]]:
-        """Key fossils by (rule, path, line); malformed records are skipped."""
+        """按 (规则, 路径, 行) 为化石计数；畸形记录跳过."""
 
         def _item(item: Any) -> tuple[str, str, int] | None:
             if not isinstance(item, dict):
@@ -283,7 +283,7 @@ def diff(
 
 @app.command()
 def rules() -> None:
-    """List builtin rules with their provenance."""
+    """列出内置规则及其来源."""
     registry = RuleRegistry.load_builtin()
     table = Table(title=f"builtin rules ({len(registry)})")
     table.add_column("ID")
@@ -315,13 +315,13 @@ def _write_annotation_json(
     annotated: list[AnnotatedFinding],
     output: Path,
 ) -> None:
-    """Write the annotation report as the canonical JSON document.
+    """把标注报告写为规范的 JSON 文档.
 
     Args:
-        root: Scan root directory (echoed for provenance).
-        tool: Source linter tool.
-        annotated: Labeled findings.
-        output: Output file path.
+        root: 扫描根目录（写入 provenance）.
+        tool: 来源 linter 工具.
+        annotated: 已标注的 finding.
+        output: 输出文件路径.
     """
     by_era: Counter[str] = Counter()
     by_category: Counter[str] = Counter()
@@ -376,10 +376,10 @@ def _write_annotation_json(
 
 
 def _print_annotation_table(annotated: list[AnnotatedFinding]) -> None:
-    """Render the annotated findings as a human-readable table.
+    """把标注 finding 渲染为人类可读的表格.
 
     Args:
-        annotated: Labeled findings.
+        annotated: 已标注的 finding.
     """
     table = Table(title="external findings with archaeology labels")
     table.add_column("Tool")
@@ -417,22 +417,21 @@ def annotate(
     fmt: str = typer.Option("table", "--format", "-f", help="Output format: table, json."),
     output: Path | None = OutputOpt,
 ) -> None:
-    """Attach era/category archaeology labels to an external linter report.
+    """为外部 linter 报告附加 era/category 考古标签.
 
-    Imports clang-tidy / PMD / eslint output and labels every finding with
-    lang-fossil archaeology metadata (era, category, provenance). Findings
-    that cannot be dated are reported as ``unannotated`` -- never invented.
+    导入 clang-tidy / PMD / eslint 输出，为每条 finding 附上 lang-fossil
+    考古元数据（era、category、provenance）。无法断代的 finding 报告为
+    ``unannotated``——绝不捏造.
 
     Args:
-        root: Repository root (paths in the report are resolved against it).
-        report: External linter report to import.
-        tool: Which tool produced ``report``.
-        fmt: Report format (table, json).
-        output: Output file path (json only; table always prints).
+        root: 仓库根（报告中的路径相对它解析）.
+        report: 待导入的外部 linter 报告.
+        tool: 生成 ``report`` 的工具.
+        fmt: 输出格式（table, json）.
+        output: 输出文件路径（仅 json；table 始终打印）.
 
     Raises:
-        typer.Exit: On an unsupported tool, unreadable report, or invalid
-            content (exit code 2).
+        typer.Exit: 工具不支持、报告不可读或内容非法（退出码 2）.
     """
     resolved_root = root.resolve()
     try:
@@ -468,11 +467,11 @@ def fix(
         False, "--apply", help="Actually run the fixer commands (tools must be installed)."
     ),
 ) -> None:
-    """Print (or run) external fixer commands for fixable fossils.
+    """打印（或运行）可修复化石对应的外部修复器命令.
 
     Args:
-        path: Directory or file to scan.
-        apply: Execute the commands instead of printing them.
+        path: 目录或文件.
+        apply: 执行命令而非打印（需已安装工具）.
     """
     try:
         result, _report, _settings = _run_scan(path, None, False)
@@ -502,7 +501,7 @@ def fix(
 
 
 def _version_callback(value: bool) -> None:
-    """Eagerly print the version and exit when ``--version`` is passed."""
+    """传入 ``--version`` 时立即打印版本并退出."""
     if value:
         console.print(f"lang-fossil {__version__}")
         raise typer.Exit(EXIT_OK)
@@ -519,11 +518,11 @@ def main_callback(
         help="Show version.",
     ),
 ) -> None:
-    """lang-fossil: archaeology for codebases."""
+    """lang-fossil：代码考古学."""
 
 
 def main() -> None:
-    """Console-script entry point."""
+    """console-script 入口."""
     app()
 
 

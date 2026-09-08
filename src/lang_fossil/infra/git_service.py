@@ -1,8 +1,8 @@
-"""Read-only git subprocess wrapper (optional enrichment module).
+"""只读 git 子进程封装（可选富化模块）.
 
-Security posture (spec section 2.3): git is invoked read-only, arguments are
-always passed as a list (``shell=False``), and only whitelisted verbs are
-accepted.
+安全姿态（规范 2.3 节）：git 只读调用、参数始终以列表传递
+（``shell=False``）、动词白名单。红线：白名单约束的是动词，参数也必须
+来自代码常量——扩展调用前须确认不含 ``--output=`` 之类的写盘参数.
 """
 
 from __future__ import annotations
@@ -11,11 +11,11 @@ import subprocess
 from pathlib import Path
 
 _READ_ONLY_VERBS = frozenset({"log", "blame", "rev-parse", "show", "status", "diff"})
-_DEFAULT_TIMEOUT = 10.0
+_DEFAULT_TIMEOUT = 10.0  # 子进程超时（秒）
 
 
 class GitServiceError(Exception):
-    """Raised when git is unavailable or refuses a read-only query."""
+    """git 不可用或只读查询被拒时抛出."""
 
 
 def run_git(
@@ -23,18 +23,18 @@ def run_git(
     cwd: Path | None = None,
     timeout: float = _DEFAULT_TIMEOUT,
 ) -> subprocess.CompletedProcess[str] | None:
-    """Run a read-only git command.
+    """执行只读 git 命令.
 
     Args:
-        args: Git arguments; the first element must be a whitelisted verb.
-        cwd: Working directory for the command.
-        timeout: Kill the subprocess after this many seconds.
+        args: git 参数；首元素必须是白名单动词.
+        cwd: 命令工作目录.
+        timeout: 超时后终止子进程.
 
     Returns:
-        The completed process, or ``None`` when git is not installed.
+        已完成的进程；git 未安装时返回 ``None``.
 
     Raises:
-        GitServiceError: If the verb is not whitelisted or git times out.
+        GitServiceError: 动词不在白名单或 git 超时.
     """
     if not args or args[0] not in _READ_ONLY_VERBS:
         raise GitServiceError(f"git verb not allowed: {args[:1]!r}")
@@ -44,7 +44,7 @@ def run_git(
             cwd=cwd,
             capture_output=True,
             text=True,
-            shell=False,  # noqa: S603 - arguments are list-passed, never a shell string
+            shell=False,  # noqa: S603 - 参数列表传递，绝非 shell 字符串
             timeout=timeout,
             check=False,
         )
@@ -55,28 +55,27 @@ def run_git(
 
 
 def is_repo(cwd: Path) -> bool:
-    """Check whether a directory is inside a git work tree.
+    """检查目录是否位于某个 git 工作树内.
 
     Args:
-        cwd: Directory to probe.
+        cwd: 探测目录.
 
     Returns:
-        True if git reports a work tree (also False when git is missing).
+        git 报告存在工作树则为 True（git 缺失时也为 False）.
     """
     proc = run_git(["rev-parse", "--is-inside-work-tree"], cwd=cwd)
     return bool(proc and proc.returncode == 0 and proc.stdout.strip() == "true")
 
 
 def last_commit_year(cwd: Path, relpath: str) -> int | None:
-    """Get the year of the last commit touching a file (blame dating).
+    """获取文件最近一次提交的年份（blame 测年）.
 
     Args:
-        cwd: Repository root.
-        relpath: Repository-relative file path.
+        cwd: 仓库根.
+        relpath: 仓库相对文件路径.
 
     Returns:
-        The commit year, or ``None`` when unknown (not a repo, git missing,
-        or untracked file).
+        提交年份；未知（非仓库、git 缺失或未跟踪文件）时为 ``None``.
     """
     proc = run_git(["log", "-1", "--format=%ad", "--date=format:%Y", "--", relpath], cwd=cwd)
     if proc is None or proc.returncode != 0:

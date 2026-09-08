@@ -1,1 +1,1 @@
-"""Infrastructure package: git access, caching, offline data."""
+"""基础设施包：只读 git 封装、内容哈希缓存、离线快照加载."""

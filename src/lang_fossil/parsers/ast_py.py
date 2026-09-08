@@ -1,9 +1,8 @@
-"""Stdlib ``ast`` fast path for modern Python syntax.
+"""基于标准库 ``ast`` 的现代语法快路径.
 
-The rule engine matches against parso trees (the multi-version workhorse),
-so this module is used where only semantic inspection of modern code is
-needed (name extraction for clone fingerprinting, zombie API attribute
-walks) and when a cheap "is this modern-parseable" probe is enough.
+规则引擎针对 parso 树做匹配（多语法版本主力），因此本模块只用于需要
+语义检查现代代码的场景（克隆指纹的名称提取、僵尸 API 的属性遍历），
+以及廉价的"是否可按现代语法解析"探测.
 """
 
 from __future__ import annotations
@@ -14,20 +13,20 @@ from lang_fossil.core.models import ParseResult
 
 
 class AstPythonParser:
-    """Fast modern-syntax parser built on :mod:`ast`."""
+    """构建于 :mod:`ast` 之上的现代语法快速解析器."""
 
     language = "python"
 
     def parse(self, source: str, *, path: str = "<source>") -> ParseResult:
-        """Parse modern Python source.
+        """解析现代 Python 源码.
 
         Args:
-            source: Raw Python source text.
-            path: Path used in diagnostics only.
+            source: 原始源码文本.
+            path: 仅用于诊断输出的路径.
 
         Returns:
-            Parse result; on :class:`SyntaxError` the tree is ``None`` and
-            the error is reported through ``errors`` (degrade, never raise).
+            解析结果；出现 :class:`SyntaxError` 时 ``tree`` 为 ``None``，
+            错误经 ``errors`` 上报（降级而非抛出）.
         """
         try:
             tree = ast.parse(source, filename=path)
@@ -40,7 +39,7 @@ class AstPythonParser:
                 language=self.language,
                 grammar_version="stdlib",
             )
-        except RecursionError:  # pragma: no cover - defensive
+        except RecursionError:  # pragma: no cover - 防御性兜底
             return ParseResult(
                 tree=None,
                 errors=("parser failure: recursion limit",),
@@ -56,14 +55,14 @@ class AstPythonParser:
 
 
 def walk_names(tree: ast.AST) -> list[tuple[str, int, int]]:
-    """Collect all identifier leaves from an AST.
+    """收集 AST 中全部标识符.
 
     Args:
-        tree: Parsed module node.
+        tree: 已解析的模块节点.
 
     Returns:
-        Tuples of ``(name, lineno, col_offset)`` for every ``Name`` and
-        ``Attribute`` identifier in the tree.
+        树中每个 ``Name`` / ``Attribute`` 标识符的
+        ``(名称, 行号, 列偏移)`` 元组.
     """
     names: list[tuple[str, int, int]] = []
     for node in ast.walk(tree):

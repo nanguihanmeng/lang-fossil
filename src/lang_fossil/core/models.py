@@ -1,16 +1,15 @@
-"""Domain models for lang-fossil.
+"""lang-fossil 的领域模型.
 
-Domain objects are frozen dataclasses (see PRD section 5.1); configuration
-models use pydantic (see :mod:`lang_fossil.config`).
+领域对象使用冻结 dataclass（见 PRD 5.1 节）；配置模型使用 pydantic
+（见 :mod:`lang_fossil.config`）.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-# Reserved era / rule identifiers. These strings carry aggregation semantics
-# (unsafe findings form their own stratum; meta findings are tool-level), so
-# they live in one place to keep every comparison on the same spelling.
+# 保留 era / 规则标识符。这些字符串承载聚合语义（unsafe 发现构成独立
+# 地层；meta 发现属于工具级诊断），集中一处确保所有比较拼写一致.
 ERA_UNSAFE = "unsafe"
 ERA_META = "meta"
 RULE_ID_META = "LF-IO"
@@ -18,21 +17,20 @@ RULE_ID_META = "LF-IO"
 
 @dataclass(frozen=True)
 class Fossil:
-    """A single detected legacy artifact.
+    """一条检出的历史遗留产物.
 
     Attributes:
-        rule_id: Identifier of the rule that produced this fossil.
-        path: Repository-relative path of the file containing it.
-        line: 1-based line number.
-        column: 0-based column number.
-        message: Human-readable description.
-        era: Language era label (e.g. ``paleozoic``, ``mesozoic``).
-        provenance: Where the rule originated (e.g. ``pyupgrade``, ``internal``).
-        severity: One of ``info``, ``warning``, ``error``.
-        fix_hint: Optional suggestion bridging to an external fixer.
-        last_commit_year: Year of the file's last commit from optional git
-            enrichment; ``None`` when git dating is off, the file is not in a
-            repository, or the commit year is unknown.
+        rule_id: 产生该化石的规则标识.
+        path: 所在文件的仓库相对路径.
+        line: 1 起始的行号.
+        column: 0 起始的列号.
+        message: 面向用户的描述.
+        era: 地层时代标签（如 ``paleozoic``、``mesozoic``）.
+        provenance: 规则来源（如 ``pyupgrade``、``internal``）.
+        severity: ``info`` / ``warning`` / ``error`` 之一.
+        fix_hint: 可选的外部修复器建议.
+        last_commit_year: 文件最近提交年（可选 git 富化）；关闭/未知时
+            为 ``None``.
     """
 
     rule_id: str
@@ -44,22 +42,22 @@ class Fossil:
     provenance: str
     severity: str = "warning"
     fix_hint: str | None = None
-    # Optional git enrichment; None when dating is off/unknown. Kept at the end
-    # with a default so stale cached payloads (which lack the key) still load.
+    # 可选 git 富化；关闭/未知时为 None。带默认值置于末尾，使缺少该键的
+    # 旧缓存载荷仍可正常加载.
     last_commit_year: int | None = None
 
 
 @dataclass(frozen=True)
 class ParseResult:
-    """Outcome of parsing one file; parsing failures degrade, never abort.
+    """单文件解析结果；解析失败一律降级，绝不中断.
 
     Attributes:
-        tree: The parsed tree (parser-specific), or ``None`` on hard failure.
-        errors: Non-fatal parse/syntax errors collected during parsing.
-        language: Sniffed language (``python`` or ``javascript``).
-        grammar_version: Grammar version used by the parser (e.g. ``"2.7"``),
-            or ``"n/a"`` for heuristic parsers.
-        heuristic: True when the parse (or language) is regex-heuristic only.
+        tree: 语言专属的解析树，整体失败时为 ``None``.
+        errors: 解析过程中收集的非致命错误.
+        language: 嗅探出的语言（如 ``python``）.
+        grammar_version: 解析使用的语法版本（如 ``"2.7"``）；启发式
+            解析器为 ``"n/a"``.
+        heuristic: 解析（或语言识别）仅为正则启发式时为 True.
     """
 
     tree: object | None
@@ -71,7 +69,7 @@ class ParseResult:
 
 @dataclass(frozen=True)
 class FileEntry:
-    """A file selected for scanning."""
+    """一个被选中待扫描的文件."""
 
     path: str
     language: str
@@ -79,13 +77,13 @@ class FileEntry:
 
 @dataclass(frozen=True)
 class CloneMatch:
-    """A cross-file code clone detected by fingerprinting.
+    """winnowing 指纹检出的跨文件代码克隆.
 
     Attributes:
-        path_a / line_a: First occurrence location.
-        path_b / line_b: Second occurrence location.
-        fingerprint: Shared k-gram hash.
-        token_count: Length of the duplicated token sequence.
+        path_a / line_a: 第一处出现位置.
+        path_b / line_b: 第二处出现位置.
+        fingerprint: 共享的 k-gram 哈希.
+        token_count: 重复 token 序列长度.
     """
 
     path_a: str
@@ -98,7 +96,7 @@ class CloneMatch:
 
 @dataclass(frozen=True)
 class ScanResult:
-    """Aggregated result of a full scan."""
+    """一次完整扫描的聚合结果."""
 
     fossils: tuple[Fossil, ...]
     scanned_files: int

@@ -1,9 +1,8 @@
-"""Zombie API detection (P0 differentiator, data-driven).
+"""僵尸 API 检测（P0 差异化能力，数据驱动）.
 
-Lint ecosystems only flag what is *upgradeable*; this module flags what is
-already *dead*: standard-library modules and APIs that have been removed
-from Python entirely, detected against the offline ``dead-packages.json``
-snapshot (no network access).
+lint 生态只标记"可升级"的对象；本模块标记"已死亡"的对象：彻底从
+Python 标准库移除的模块与 API，对照随包分发的 ``dead-packages.json``
+离线快照检测（零网络访问）.
 """
 
 from __future__ import annotations
@@ -15,15 +14,15 @@ from lang_fossil.infra.offline_db import load_snapshot
 
 
 def iter_tree(node: Any) -> Any:
-    """Yield a parso node and all its descendants.
+    """产出 parso 节点及其全部后代.
 
-    Shared by zombie detection and the rule engine (both walk parso trees).
+    僵尸检测与规则引擎共用（两者都遍历 parso 树）.
 
     Args:
-        node: Root parso node.
+        node: 根 parso 节点.
 
     Yields:
-        Every node and leaf in the tree.
+        树中每个节点与叶子.
     """
     yield node
     for child in getattr(node, "children", []):
@@ -31,13 +30,13 @@ def iter_tree(node: Any) -> Any:
 
 
 def _dotted_value(node: Any) -> str:
-    """Render a dotted_name node (or name leaf) to its dotted string.
+    """把 dotted_name 节点（或 name 叶）渲染成点分字符串.
 
     Args:
-        node: A parso ``dotted_name`` node or ``name`` leaf.
+        node: parso 的 ``dotted_name`` 节点或 ``name`` 叶.
 
     Returns:
-        The dotted module name, e.g. ``distutils.util``.
+        点分模块名，如 ``distutils.util``.
     """
     value = getattr(node, "value", None)
     if value is not None and not getattr(node, "children", None):
@@ -52,20 +51,20 @@ def _dotted_value(node: Any) -> str:
 
 
 def _import_name_modules(node: Any) -> list[str]:
-    """Extract module names from a plain ``import`` statement node.
+    """从普通 ``import`` 语句节点提取模块名.
 
     Args:
-        node: A parso ``import_name`` node (children after the keyword).
+        node: parso 的 ``import_name`` 节点（children 从关键字之后开始）.
 
     Returns:
-        Dotted module names (aliases are ignored).
+        点分模块名列表（忽略别名）.
     """
     modules: list[str] = []
 
     def _collect(target: Any) -> None:
-        """Collect module strings from one import clause."""
+        """收集一个导入子句中的模块字符串."""
         children = getattr(target, "children", None)
-        if children is None:  # plain name leaf
+        if children is None:  # 普通 name 叶
             modules.append(target.value)
             return
         for child in children:
@@ -76,7 +75,7 @@ def _import_name_modules(node: Any) -> list[str]:
             elif child.type in ("dotted_as_name", "dotted_as_names"):
                 _collect(child)
             elif child.type == "keyword":
-                break  # 'as': the alias is not a module
+                break  # 'as'：别名不是模块
 
     for child in node.children[1:]:
         if child.type == "operator" and child.value == ",":
@@ -86,20 +85,20 @@ def _import_name_modules(node: Any) -> list[str]:
 
 
 def _import_from_module(node: Any) -> str | None:
-    """Extract the module name from a ``from ... import ...`` node.
+    """从 ``from ... import ...`` 节点提取模块名.
 
     Args:
-        node: A parso ``import_from`` node.
+        node: parso 的 ``import_from`` 节点.
 
     Returns:
-        The dotted module name, or ``None`` for relative imports.
+        点分模块名；相对导入返回 ``None``（根不稳定）.
     """
     parts: list[str] = []
     for child in node.children[1:]:
         if child.type == "keyword":
-            break  # reached 'import'
+            break  # 到达 'import'
         if child.type == "operator":
-            parts.append(".")  # relative import marker
+            parts.append(".")  # 相对导入标记
         elif child.type in ("name", "dotted_name"):
             parts.append(_dotted_value(child))
     module = "".join(parts)
@@ -109,14 +108,13 @@ def _import_from_module(node: Any) -> str | None:
 
 
 def iter_import_modules(tree: Any) -> list[tuple[str, int, int]]:
-    """Extract imported module names with positions from a parso tree.
+    """从 parso 树提取带位置的导入模块名.
 
     Args:
-        tree: parso module node.
+        tree: parso 模块节点.
 
     Returns:
-        Tuples of ``(module_name, line, column)`` for plain and ``from``
-        imports (relative imports are skipped; their root is not stable).
+        ``(模块名, 行, 列)`` 元组列表（普通与 from 导入；相对导入跳过）.
     """
     found: list[tuple[str, int, int]] = []
     for node in iter_tree(tree):
@@ -130,23 +128,22 @@ def iter_import_modules(tree: Any) -> list[tuple[str, int, int]]:
     return found
 
 
-# One dead-package snapshot entry (module-level or attribute-level removal).
+# 一条 dead-package 快照条目（模块级或属性级移除）.
 _Entry = dict[str, Any]
 
 
 class ZombieApiDB:
-    """In-memory index of the offline removal snapshot."""
+    """离线移除快照的内存索引."""
 
     def __init__(self, snapshot: dict[str, Any]) -> None:
-        """Index snapshot entries by module root and module+attribute.
+        """按模块根与"模块+属性"索引快照条目.
 
         Args:
-            snapshot: Parsed ``dead-packages.json`` document.
+            snapshot: 解析后的 ``dead-packages.json`` 文档.
 
         Raises:
-            ValueError: If an attribute-level entry carries a dotted attribute
-                name. Attribute detection matches single name leaves, so a
-                dotted attribute would silently never fire; reject it at load.
+            ValueError: 属性级条目携带点分属性名。属性检测匹配单个
+                name 叶，点分属性会静默永不命中，加载即拒绝.
         """
         self.snapshot_version: str = str(snapshot.get("snapshot_version", "unknown"))
         self._by_module: dict[str, list[_Entry]] = {}
@@ -170,37 +167,37 @@ class ZombieApiDB:
 
     @classmethod
     def load(cls) -> ZombieApiDB:
-        """Load the bundled offline snapshot.
+        """加载随包分发的离线快照.
 
         Returns:
-            A database; empty (no entries) when no snapshot is available.
+            数据库；无快照可用时为空（零条目）.
         """
         return cls(load_snapshot())
 
     @property
     def entry_count(self) -> int:
-        """Return the number of indexed snapshot entries."""
+        """返回已索引的快照条目数."""
         return len(self._by_module) + len(self._by_attribute)
 
     def entries_for_module(self, root: str) -> list[_Entry]:
-        """Return removal entries indexed under a module root.
+        """返回某模块根下索引的移除条目.
 
         Args:
-            root: First segment of a dotted module name.
+            root: 点分模块名的首段.
 
         Returns:
-            Matching snapshot entries (possibly empty).
+            匹配的快照条目（可能为空）.
         """
         return self._by_module.get(root, [])
 
     @property
     def attribute_entries(self) -> dict[tuple[str, str], list[_Entry]]:
-        """Return entries keyed by ``(module_root, attribute)``."""
+        """返回按 ``(模块根, 属性)`` 索引的条目."""
         return self._by_attribute
 
 
 def _make_fossil(path: str, line: int, column: int, entry: _Entry, version: str) -> Fossil:
-    """Build a fossil from a snapshot entry and a source position."""
+    """由快照条目与源码位置构建化石."""
     module = entry["module"]
     attribute = entry.get("attribute")
     target = f"{module}.{attribute}" if attribute else module
@@ -223,17 +220,16 @@ def _make_fossil(path: str, line: int, column: int, entry: _Entry, version: str)
 
 
 def detect_zombie_apis(path: str, parse_result: ParseResult, db: ZombieApiDB) -> list[Fossil]:
-    """Detect removed standard-library API usage in a parsed Python file.
+    """检测 Python 文件中已移除标准库 API 的使用.
 
     Args:
-        path: Repository-relative path (for reporting).
-        parse_result: Parse result carrying a parso tree.
-        db: Loaded zombie API database.
+        path: 仓库相对路径（用于报告）.
+        parse_result: 携带 parso 树的解析结果.
+        db: 已加载的僵尸 API 数据库.
 
     Returns:
-        Fossils for removed-module imports and removed attribute usage.
-        Files without a tree (hard parse failure) yield nothing: detection
-        degrades instead of interrupting the scan.
+        已移除模块导入与已移除属性使用的化石。无树（硬解析失败）的
+        文件返回空：检测降级而非中断扫描.
     """
     tree = parse_result.tree
     if tree is None:
@@ -243,15 +239,15 @@ def detect_zombie_apis(path: str, parse_result: ParseResult, db: ZombieApiDB) ->
     imports = iter_import_modules(tree)
     imported_roots = {module.split(".")[0] for module, _line, _col in imports}
 
+    # 模块级条目：导入名与移除模块（或其子模块）匹配即命中.
     for module, line, column in imports:
         for entry in db.entries_for_module(module.split(".")[0]):
             if entry["module"] == module or module.startswith(entry["module"] + "."):
                 fossils.append(_make_fossil(path, line, column, entry, db.snapshot_version))
 
-    # Attribute-level entries: match module.attr chains, or bare names when
-    # the module root is imported in the same file.
-    # ponytail: naive O(names x attribute-entries) walk; invert the index on
-    # attribute name once the snapshot grows well past its current ~4 entries.
+    # 属性级条目：匹配 module.attr 链，或模块根已导入时的裸名使用.
+    # ponytail: 朴素的 O(names x attribute-entries) 遍历；快照增长远超
+    # 当前 ~4 条规模时再按属性名反转索引.
     for node in iter_tree(tree):
         if getattr(node, "type", "") != "name":
             continue

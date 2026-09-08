@@ -1,13 +1,11 @@
-"""Code clone fingerprinting via winnowing (P1 differentiator).
+"""基于 winnowing 的代码克隆指纹（P1 差异化能力）.
 
-Detects cross-file copy-pasted code: "the same fossil appearing in three
-strata". Token streams are hashed into k-grams, and the classic winnowing
-algorithm (Schleimer et al., 2007) selects a minimal fingerprint set with a
-guarantee: any match longer than the window size is detected.
+检测跨文件复制粘贴："同一块化石出现在三个地层"。token 流哈希为
+k-gram，经典 winnowing 算法（Schleimer 等，2007）选出带保证的最小
+指纹集：任何超过窗口长度的重复都可检出.
 
-Status: experimental *archaeological signal* — repeated legacy code across
-strata. Not a general-purpose duplicate detector; dedicated tools (PMD-CPD
-and friends) own that space.
+状态：实验性的考古信号——跨地层重复的遗留代码，不是通用查重工具；
+专业查重属于 PMD-CPD 等工具的领域.
 """
 
 from __future__ import annotations
@@ -19,27 +17,26 @@ from lang_fossil.core.models import CloneMatch
 
 _TOKEN_RE = re.compile(r"[A-Za-z_]\w*|\d+(?:\.\d+)?|\"[^\"]*\"|'[^']*'|[^\s\w]")
 
-# Comment syntax stripped before tokenizing (Python + JS conventions).
+# 分词前剥离的注释语法（Python + JS 约定）.
 _LINE_COMMENT_RE = re.compile(r"#[^\n]*|//[^\n]*")
 _BLOCK_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
 
-_DEFAULT_K = 8  # k-gram length (tokens)
-_DEFAULT_W = 4  # winnowing window (hashes)
-_MAX_PAIRS = 200  # report cap to keep reports usable
-_MIN_CLONE_SITES = 2  # a fingerprint needs >=2 distinct sites to be a clone
+_DEFAULT_K = 8  # k-gram 长度（token 数）
+_DEFAULT_W = 4  # winnowing 窗口（哈希数）
+_MAX_PAIRS = 200  # 报告上限，保持报告可用
+_MIN_CLONE_SITES = 2  # 一个指纹至少出现在 2 处才算克隆
 
 
 def tokenize(source: str) -> list[tuple[str, int]]:
-    """Tokenize source into normalized tokens with line numbers.
+    """把源码分词为带行号的规范化 token.
 
-    Comments and whitespace are dropped implicitly (they match no token);
-    token values are case-normalized for identifiers.
+    注释与空白因不匹配任何 token 而被隐式丢弃；标识符统一小写.
 
     Args:
-        source: Raw source text (any brace/indent language).
+        source: 原始源码文本（任意大括号/缩进语言）.
 
     Returns:
-        Tuples of ``(token, line)``.
+        ``(token, line)`` 元组列表.
     """
     tokens: list[tuple[str, int]] = []
     line = 1
@@ -56,15 +53,14 @@ def tokenize(source: str) -> list[tuple[str, int]]:
 
 
 def _kgram_hashes(tokens: list[tuple[str, int]], k: int) -> list[tuple[str, int]]:
-    """Hash every k-gram to a stable digest.
+    """对每个 k-gram 计算稳定哈希.
 
     Args:
-        tokens: Token stream from :func:`tokenize`.
-        k: K-gram length.
+        tokens: :func:`tokenize` 的 token 流.
+        k: k-gram 长度.
 
     Returns:
-        Tuples of ``(fingerprint, line_of_first_token)``; fewer than ``k``
-        tokens yields no fingerprints.
+        ``(指纹, 首 token 行号)`` 元组列表；token 不足 ``k`` 个返回空.
     """
     if len(tokens) < k:
         return []
@@ -78,14 +74,14 @@ def _kgram_hashes(tokens: list[tuple[str, int]], k: int) -> list[tuple[str, int]
 
 
 def _winnow(hashes: list[tuple[str, int]], w: int) -> list[tuple[str, int]]:
-    """Select the winnowing fingerprint set (rightmost minimum per window).
+    """选出 winnowing 指纹集（每窗口取最右最小值）.
 
     Args:
-        hashes: K-gram hashes from :func:`_kgram_hashes`.
-        w: Window size.
+        hashes: :func:`_kgram_hashes` 的哈希列表.
+        w: 窗口大小.
 
     Returns:
-        Selected ``(fingerprint, line)`` pairs.
+        选中的 ``(指纹, 行号)`` 列表.
     """
     if not hashes:
         return []
@@ -95,7 +91,7 @@ def _winnow(hashes: list[tuple[str, int]], w: int) -> list[tuple[str, int]]:
     last_index = -1
     for start in range(len(hashes) - w + 1):
         window = hashes[start : start + w]
-        # Rightmost minimum: guarantees the gap property of winnowing.
+        # 最右最小值：保证 winnowing 的间隔性质.
         best_index = start + max(
             i for i, item in enumerate(window) if item[0] == min(x[0] for x in window)
         )
@@ -110,15 +106,15 @@ def detect_clones(
     k: int = _DEFAULT_K,
     w: int = _DEFAULT_W,
 ) -> list[CloneMatch]:
-    """Detect cross-file clones among a set of sources.
+    """在一组源码文件间检测跨文件克隆.
 
     Args:
-        files: Tuples of ``(path, source)``.
-        k: K-gram length in tokens.
-        w: Winnowing window size.
+        files: ``(路径, 源码)`` 元组列表.
+        k: token 数表示的 k-gram 长度.
+        w: winnowing 窗口大小.
 
     Returns:
-        Clone matches, one per file pair, capped at ``_MAX_PAIRS`` entries.
+        克隆匹配，每个文件对一条，封顶 ``_MAX_PAIRS`` 条.
     """
     fingerprint_index: dict[str, list[tuple[str, int]]] = {}
     for path, source in files:
@@ -151,10 +147,10 @@ def detect_clones(
                     )
                 )
 
-    # One duplicated region yields several shared fingerprints (winnowing picks
-    # one per window), so collapse to the earliest anchor per file pair.
-    # ponytail: file-pair granularity; a second, separate duplicated region in
-    # the same file pair is under-reported. Revisit if that case matters.
+    # 同一段重复代码会产生多个共享指纹（winnowing 每窗口选一个），
+    # 折叠为每个文件对最早的锚点一条.
+    # ponytail: 文件对粒度；同一文件对的第二段独立重复会被漏报，
+    # 出现真实需求再升级.
     earliest: dict[frozenset[str], CloneMatch] = {}
     for match in matches:
         key = frozenset((match.path_a, match.path_b))

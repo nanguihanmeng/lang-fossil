@@ -1,1 +1,1 @@
-"""CLI package (typer command layer)."""
+"""CLI 包（typer 命令层）."""

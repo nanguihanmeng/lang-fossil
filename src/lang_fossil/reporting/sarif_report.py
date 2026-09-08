@@ -1,4 +1,4 @@
-"""SARIF 2.1.0 report writer for CI platform integration."""
+"""SARIF 2.1.0 报告写入器，用于 CI 平台集成."""
 
 from __future__ import annotations
 
@@ -10,22 +10,23 @@ from lang_fossil import __version__
 from lang_fossil.core.models import ScanResult
 from lang_fossil.core.stratigraphy import StratigraphyReport
 
+# 严重级 -> SARIF level 映射.
 _SEVERITY_TO_SARIF = {"error": "error", "warning": "warning", "info": "note"}
 
 
 def write_report(
     scan_result: ScanResult, report: StratigraphyReport, root: Path, output: Path
 ) -> Path:
-    """Write a SARIF 2.1.0 report to disk.
+    """把 SARIF 2.1.0 报告写入磁盘.
 
     Args:
-        scan_result: Raw scan outcome.
-        report: Aggregated stratigraphy report (rule metadata source).
-        root: Scan root directory (used to build URIs).
-        output: Output file path.
+        scan_result: 原始扫描产物.
+        report: 聚合的地层报告（规则元数据来源）.
+        root: 扫描根目录（用于构造 URI）.
+        output: 输出文件路径.
 
     Returns:
-        The written path.
+        写入的路径.
     """
     rules: dict[str, dict[str, Any]] = {}
     results = []

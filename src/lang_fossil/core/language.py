@@ -1,29 +1,26 @@
-"""Language sniffing shared by discovery, rule packs and ``--fix`` bridging.
+"""语言嗅探：供发现阶段、规则包与 --fix 桥接共用.
 
-Classification is extension-based. The C/C++ ``.h`` extension is ambiguous and
-is resolved by *configuration*, not by content scoring: the scan settings
-carry an ``ambiguous_headers`` policy (``mode`` plus glob ``overrides``), and
-the discovery stage resolves each header against it (see
-:mod:`lang_fossil.core.scanner`).
+分类基于扩展名。C/C++ 共用的 ``.h`` 存在歧义，由配置策略解析而非内容
+评分：扫描设置携带 ``ambiguous_headers`` 策略（mode 加 glob overrides），
+发现阶段据此判定每个头文件的语言归属（见 :mod:`lang_fossil.core.scanner`）.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-# Canonical language identifiers. Keep in sync with RuleSpec.language and the
-# scanner ``parsers`` registry.
+# 规范的语言标识符。与 RuleSpec.language 及 scanner 的 parsers 注册表保持同步.
 SUPPORTED_LANGUAGES = ("python", "javascript", "c", "cpp", "csharp", "java")
 
-# Languages served by a generic line-based parser (HeuristicParser). Python is
-# excluded: it has a real tree front end (parso/ast). Derived from the single
-# SUPPORTED_LANGUAGES list so a new language cannot be forgotten in the
-# scanner's parser registry.
+# 由通用逐行解析器（HeuristicParser）支持的语言；Python 除外——它有真正的
+# 语法树前端（parso/ast）。派生自唯一的 SUPPORTED_LANGUAGES，新增语言不会
+# 在 scanner 的解析器注册表中被遗漏.
 HEURISTIC_LANGUAGES = tuple(lang for lang in SUPPORTED_LANGUAGES if lang != "python")
 
-# Marker for the ambiguous C/C++ header extension; resolved by config policy.
+# C/C++ 歧义头文件扩展名标记；由 ambiguous_headers 配置策略解析.
 HEADER_AMBIGUOUS = "c_header"
 
+# 扩展名 -> 语言的唯一映射；.h 的值是歧义标记.
 _LANG_BY_EXT = {
     ".py": "python",
     ".pyw": "python",
@@ -32,7 +29,7 @@ _LANG_BY_EXT = {
     ".cjs": "javascript",
     ".jsx": "javascript",
     ".c": "c",
-    ".h": HEADER_AMBIGUOUS,  # resolved by the ambiguous_headers policy
+    ".h": HEADER_AMBIGUOUS,  # 由 ambiguous_headers 策略解析
     ".cpp": "cpp",
     ".cc": "cpp",
     ".cxx": "cpp",
@@ -45,15 +42,14 @@ _LANG_BY_EXT = {
 
 
 def sniff_language(path: Path) -> str | None:
-    """Sniff the language of a file from its extension.
+    """按扩展名嗅探文件语言.
 
     Args:
-        path: Candidate file path.
+        path: 候选文件路径.
 
     Returns:
-        A language identifier, ``HEADER_AMBIGUOUS`` for C/C++ headers that
-        need configuration-based resolution, or ``None`` for unsupported
-        files.
+        语言标识；C/C++ 共用的 ``.h`` 返回 ``HEADER_AMBIGUOUS``（待配置
+        解析）；不支持的扩展名返回 ``None``.
     """
     return _LANG_BY_EXT.get(path.suffix.lower())
 
