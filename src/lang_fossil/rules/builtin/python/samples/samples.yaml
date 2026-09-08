@@ -1,0 +1,31 @@
+# Sample corpus for the builtin python/paleozoic pack.
+# Positive samples must hit their rule; negative samples must not.
+samples:
+  positive:
+    - id: PF001
+      code: "print 'hello'\n"
+    - id: PF002
+      code: 'x = ur"unicode raw"\n'
+    - id: PF003
+      code: "if d.has_key(k):\n    pass\n"
+    - id: PF004
+      code: "for i in xrange(10):\n    pass\n"
+    - id: PF005
+      code: "for k in d.iteritems():\n    pass\n"
+    - id: PF006
+      code: "import sets\n"
+    - id: PF007
+      code: "import cPickle\n"
+    - id: PF008
+      code: "raise ValueError, 'boom'\n"
+    - id: PF009
+      code: "x = `y`\n"
+  negative:
+    - id: PF001
+      code: "print('hello')\n"
+    - id: PF003
+      code: "if k in d:\n    pass\n"
+    - id: PF004
+      code: "for i in range(10):\n    pass\n"
+    - id: PF008
+      code: "raise ValueError('boom')\n"

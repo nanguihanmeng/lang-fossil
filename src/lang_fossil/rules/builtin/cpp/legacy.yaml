@@ -1,0 +1,62 @@
+# Builtin C++ rule pack: pre-standard and removed-idiom fossils.
+# Heuristic line rules (no C++ AST parser): match on raw source lines.
+# Every rule is a fossil substantiated by its removed/deprecated standard.
+rules:
+  - id: CXX001
+    language: cpp
+    era: cpp98
+    removed_in: "cpp98"
+    message: "#include <iostream.h> is pre-standard; use <iostream>"
+    severity: error
+    provenance: "ecosystem: internal; pre-ISO C++ era"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "^\\s*#include\\s*<iostream\\.h>"
+  - id: CXX002
+    language: cpp
+    era: cpp17
+    deprecated_in: "c++11"
+    removed_in: "c++17"
+    message: "std::auto_ptr was removed in C++17; use std::unique_ptr"
+    severity: error
+    provenance: "ecosystem: clang-tidy modernize-replace-auto_ptr; cppcheck"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bstd::auto_ptr\\s*<"
+  - id: CXX003
+    language: cpp
+    era: cpp17
+    deprecated_in: "c++11"
+    removed_in: "c++17"
+    message: "dynamic exception specification 'throw()' was removed in C++17; use noexcept"
+    severity: warning
+    provenance: "ecosystem: clang-tidy modernize-*; cppcoreguidelines"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bthrow\\s*\\(\\s*\\)"
+  - id: CXX004
+    language: cpp
+    era: cpp17
+    removed_in: "c++17"
+    message: "'register' storage class was removed in C++17"
+    severity: warning
+    provenance: "ecosystem: cppcoreguidelines; clang-tidy"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bregister\\s+[A-Za-z_]\\w*"
+  - id: CXX005
+    language: cpp
+    era: cpp17
+    deprecated_in: "c++11"
+    removed_in: "c++17"
+    message: "std::binary_function/bind1st/bind2nd family was removed in C++17; use lambdas"
+    severity: warning
+    provenance: "ecosystem: cppcoreguidelines; cppcheck"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bstd::(?:binary_function|unary_function|ptr_fun|mem_fun|bind1st|bind2nd)\\b"

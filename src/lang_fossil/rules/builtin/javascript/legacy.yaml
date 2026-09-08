@@ -1,0 +1,53 @@
+# Builtin JavaScript rule pack (explicitly heuristic: no JS parser).
+# These are legacy/bad-practice patterns that remain legal JavaScript today:
+# they are review findings (category unsafe, era "unsafe"), never dated as
+# removed fossils.
+rules:
+  - id: JS001
+    language: javascript
+    category: unsafe
+    era: unsafe
+    message: "'with' statement is forbidden in strict mode; refactor to destructuring"
+    severity: error
+    provenance: "ecosystem: eslint (no-with)"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "^\\s*with\\s*\\("
+
+  - id: JS002
+    language: javascript
+    category: unsafe
+    era: unsafe
+    message: "'var' has function scope; prefer 'let'/'const'"
+    severity: warning
+    provenance: "ecosystem: eslint (no-var)"
+    fix_hint: "eslint --fix"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "^\\s*var\\s+\\w"
+
+  - id: JS003
+    language: javascript
+    category: unsafe
+    era: unsafe
+    message: "document.all is a legacy DOM relic"
+    severity: info
+    provenance: "ecosystem: internal"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "document\\.all"
+
+  - id: JS004
+    language: javascript
+    category: unsafe
+    era: unsafe
+    message: "eval() executes arbitrary code; avoid it"
+    severity: error
+    provenance: "ecosystem: eslint (no-eval)"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\beval\\s*\\("

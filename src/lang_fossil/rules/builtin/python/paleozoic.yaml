@@ -1,0 +1,108 @@
+# Builtin Python rule pack: Paleozoic era (Python 1.x / 2.x idioms).
+# Every rule carries provenance mapping it to the existing lint ecosystem and
+# a version label substantiating why it counts as a removed fossil.
+rules:
+  - id: PF001
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "print statement: Python 2 only, removed in Python 3"
+    severity: error
+    provenance: "internal (parso py2 grammar); ecosystem: flake8-print covers calls only"
+    match:
+      kind: node
+      target: print_stmt
+
+  - id: PF002
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "ur'' string literal is invalid in Python 3"
+    severity: error
+    provenance: "internal; ecosystem: pyupgrade rewrites u-prefixed strings"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\b[uU][rR][\"']"
+
+  - id: PF003
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "dict.has_key() was removed in Python 3; use the 'in' operator"
+    severity: error
+    provenance: "ecosystem: pyupgrade / flake8 py2 removals"
+    fix_hint: "replace d.has_key(k) with k in d"
+    match:
+      kind: attribute
+      target: has_key
+
+  - id: PF004
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "xrange() was removed in Python 3; use range()"
+    severity: error
+    provenance: "ecosystem: pyupgrade"
+    source: "https://docs.python.org/3.0/whatsnew/3.0.html"
+    fix_hint: "pyupgrade --py3-plus"
+    match:
+      kind: name
+      target: xrange
+
+  - id: PF005
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "dict.iteritems/itervalues/iterkeys were removed in Python 3"
+    severity: error
+    provenance: "ecosystem: pyupgrade"
+    fix_hint: "use items()/values()/keys()"
+    match:
+      kind: attribute
+      target: iteritems
+
+  - id: PF006
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "the 'sets' module was removed in Python 2.6; use the builtin set"
+    severity: error
+    provenance: "ecosystem: internal"
+    match:
+      kind: import
+      target: sets
+
+  - id: PF007
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "the 'cPickle' module is CPython 2 only; use pickle (or its C accelerator)"
+    severity: warning
+    provenance: "ecosystem: internal"
+    match:
+      kind: import
+      target: cPickle
+
+  - id: PF008
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "'raise E, msg' syntax is Python 2 only; use 'raise E(msg)'"
+    severity: error
+    provenance: "ecosystem: internal"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "^\\s*raise\\s+[A-Za-z_][\\w.]*\\s*,\\s*"
+
+  - id: PF009
+    language: python
+    era: paleozoic
+    removed_in: "python3"
+    message: "backtick repr `x` is Python 2 only; use repr(x)"
+    severity: error
+    provenance: "ecosystem: internal"
+    match:
+      kind: node
+      target: backtick

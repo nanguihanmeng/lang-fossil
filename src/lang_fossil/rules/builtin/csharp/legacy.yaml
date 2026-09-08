@@ -1,0 +1,54 @@
+# Builtin C# rule pack: pre-generics and unsafe legacy idioms.
+# Heuristic line rules (no C# AST parser): match on raw source lines.
+# CS001-CS003 are legacy-style findings (non-generic collections remain legal
+# today): category unsafe, never dated. CS004 is an obsolete/removed fossil.
+rules:
+  - id: CS001
+    language: csharp
+    category: unsafe
+    era: unsafe
+    message: "ArrayList is a non-generic legacy collection; prefer List<T>"
+    severity: error
+    fix_hint: "migrate to List<T>"
+    provenance: "ecosystem: .NET analyzers (CA1002); StyleCop"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bArrayList\\b"
+  - id: CS002
+    language: csharp
+    category: unsafe
+    era: unsafe
+    message: "Hashtable is a legacy collection; prefer Dictionary<TKey, TValue>"
+    severity: error
+    fix_hint: "migrate to Dictionary<TKey, TValue>"
+    provenance: "ecosystem: .NET analyzers (CA1002)"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bHashtable\\b"
+  - id: CS003
+    language: csharp
+    category: unsafe
+    era: unsafe
+    message: "non-generic Stack/Queue; prefer Stack<T> / Queue<T>"
+    severity: warning
+    fix_hint: "migrate to Stack<T> / Queue<T>"
+    provenance: "ecosystem: .NET analyzers (CA1002)"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bnew\\s+(?:Stack|Queue)\\s*\\("
+  - id: CS004
+    language: csharp
+    category: fossil
+    era: cs8
+    deprecated_in: "net core 3.0"
+    removed_in: "net 9.0"
+    message: "BinaryFormatter is unsafe and deprecated; use a safer serializer"
+    severity: warning
+    provenance: "ecosystem: .NET analyzers (SYSLIB0011); SEI CERT"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bBinaryFormatter\\b"

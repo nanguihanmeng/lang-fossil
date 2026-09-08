@@ -1,0 +1,78 @@
+# Builtin Java rule pack: legacy and deprecated-API idioms.
+# Heuristic line rules (no Java AST parser): match on raw source lines.
+# JV001-JV003 are legacy-style findings (Vector/Hashtable/StringBuffer remain
+# legal, they are pre-generics idioms): category unsafe, never dated.
+# JV004-JV006 are fossils substantiated by their @Deprecated versions.
+rules:
+  - id: JV001
+    language: java
+    category: unsafe
+    era: unsafe
+    message: "Vector is a pre-generics legacy collection; prefer ArrayList (or CopyOnWriteArrayList)"
+    severity: warning
+    fix_hint: "replace Vector with ArrayList"
+    provenance: "ecosystem: PMD (LooseCoupling); Checkstyle"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bVector\\s*<"
+  - id: JV002
+    language: java
+    category: unsafe
+    era: unsafe
+    message: "Hashtable is a pre-generics legacy collection; prefer HashMap / ConcurrentHashMap"
+    severity: warning
+    fix_hint: "replace Hashtable with HashMap / ConcurrentHashMap"
+    provenance: "ecosystem: PMD; Checkstyle"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bHashtable\\b"
+  - id: JV003
+    language: java
+    category: unsafe
+    era: unsafe
+    message: "StringBuffer is a legacy thread-safe buffer; prefer StringBuilder when unshared"
+    severity: warning
+    fix_hint: "replace StringBuffer with StringBuilder when not shared"
+    provenance: "ecosystem: PMD; Checkstyle"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bStringBuffer\\b"
+  - id: JV004
+    language: java
+    category: fossil
+    era: java-legacy
+    deprecated_in: "java 1.2"
+    message: "Thread.stop() is unsafe and deprecated; use interruption"
+    severity: error
+    provenance: "ecosystem: PMD; SEI CERT THI05-J"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bThread\\.stop\\s*\\("
+  - id: JV005
+    language: java
+    category: fossil
+    era: java-legacy
+    deprecated_in: "java 9"
+    message: "Object.finalize() is deprecated; use try-with-resources or Cleaner"
+    severity: warning
+    provenance: "ecosystem: PMD (AvoidFinalizer); SEI CERT MET12-J"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bfinalize\\s*\\("
+  - id: JV006
+    language: java
+    category: fossil
+    era: java-legacy
+    deprecated_in: "java 9"
+    message: "explicit wrapper-boxing constructor is deprecated; use valueOf()"
+    severity: warning
+    provenance: "ecosystem: Checkstyle"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bnew\\s+(?:Integer|Long|Short|Byte|Float|Double|Boolean)\\s*\\("

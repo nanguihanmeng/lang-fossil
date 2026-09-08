@@ -1,0 +1,25 @@
+name: Perf
+
+on:
+  schedule:
+    - cron: "0 3 * * 1" # weekly, Monday 03:00 UTC
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+        with: { python-version: "3.12" }
+      - run: pdm install --frozen-lockfile -G:all
+      - name: Run scan benchmark (fixed synthetic corpus)
+        run: pdm run python tests/perf/bench_scan.py --files 200
+      # Collect the weekly number; a true baseline comparison needs a stored
+      # baseline file to diff against (see bench_scan.py assertion ceiling).
+      - name: Collect scan benchmark
+        run: pdm run python tests/perf/bench_scan.py --files 200 | tee bench.txt
+      - uses: actions/upload-artifact@v4
+        with: { name: bench, path: bench.txt }

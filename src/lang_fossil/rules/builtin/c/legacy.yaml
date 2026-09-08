@@ -1,0 +1,53 @@
+# Builtin C rule pack: legacy and unsafe idioms.
+# Heuristic line rules (no C AST parser): match on raw source lines.
+# CF001 is a removed fossil (dated); CF002-CF004 are unsafe/bad-practice
+# patterns that are still legal C today and are never dated as fossils.
+rules:
+  - id: CF001
+    language: c
+    category: fossil
+    era: c11
+    removed_in: "c11"
+    message: "gets() was removed in C11; use fgets()"
+    severity: error
+    provenance: "ecosystem: SEI CERT MSC24-C; clang-tidy cert-*"
+    source: "https://en.cppreference.com/w/c/io/gets"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bgets\\s*\\("
+  - id: CF002
+    language: c
+    category: unsafe
+    era: unsafe
+    message: "sprintf() has no bounds argument; use snprintf()"
+    severity: error
+    fix_hint: "replace sprintf(dst, fmt, ...) with snprintf(dst, n, fmt, ...)"
+    provenance: "ecosystem: SEI CERT MSC24-C; cppcheck"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bsprintf\\s*\\("
+  - id: CF003
+    language: c
+    category: unsafe
+    era: unsafe
+    message: "strcpy()/strcat() are unbounded; use strncpy_s / strlcpy"
+    severity: error
+    fix_hint: "replace with a bounded copy routine (strncpy_s / strlcpy)"
+    provenance: "ecosystem: SEI CERT; cppcheck"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\b(?:strcpy|strcat)\\s*\\("
+  - id: CF004
+    language: c
+    category: unsafe
+    era: unsafe
+    message: "'register' storage class is obsolete and has no effect in modern compilers"
+    severity: warning
+    provenance: "ecosystem: internal"
+    match_mode: heuristic
+    match:
+      kind: regex
+      target: "\\bregister\\s+[A-Za-z_]\\w*"

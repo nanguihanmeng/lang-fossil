@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push: { branches: [main] }
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+        with: { python-version: "3.12" }
+      - run: pdm install --frozen-lockfile -G:all
+      - run: pdm run black --check src tests
+      - run: pdm run ruff check src tests
+      - run: pdm run mypy src
+
+  test:
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: pdm-project/setup-pdm@v4
+        with: { python-version: "${{ matrix.python-version }}" }
+      - run: pdm install --frozen-lockfile -G:all
+      - name: Core algorithm coverage gate (>=90%)
+        run: >
+          pdm run pytest tests/unit --cov=lang_fossil.core --cov=lang_fossil.parsers
+          --cov-branch --cov-fail-under=90
+      - name: Overall coverage gate (>=75%)
+        run: >
+          pdm run pytest tests/unit tests/integration tests/golden
+          --cov=lang_fossil --cov-branch
+          --cov-report=xml --cov-report=term-missing
+          --cov-fail-under=75
+      - uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.12' && matrix.os == 'ubuntu-latest'
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false  # repo setting not enabled yet; never break CI
+
+  golden:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+        with: { python-version: "3.12" }
+      - run: pdm install --frozen-lockfile -G:all
+      # Release gate: pure Py2 corpus must parse; rule hits must match snapshot.
+      - run: pdm run pytest tests/golden -m golden --strict-markers
+
+  smoke-build:
+    needs: lint
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pdm-project/setup-pdm@v4
+        with: { python-version: "3.12" }
+      - run: pdm install --frozen-lockfile -G:all
+      - run: pdm build
+      - uses: actions/upload-artifact@v4
+        with: { name: dist, path: dist/ }
