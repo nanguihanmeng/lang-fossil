@@ -2,6 +2,8 @@
 
 [EN](README.md) | **中文**
 
+<img src="assets/logo.png" alt="lang-fossil logo" />
+
 # 代码考古学
 
 **90% 的大型代码库，都活在错误的历史版本中。**

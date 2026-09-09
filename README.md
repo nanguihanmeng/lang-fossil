@@ -2,6 +2,8 @@
 
 **EN** | [中文](README_CN.md)
 
+<img src="assets/logo.png" alt="lang-fossil logo" />
+
 # lang-fossil
 
 **90% of large codebases live in the wrong historical version.**
